@@ -1,0 +1,7 @@
+interface:
+  display_name: "Skill Scanner Review"
+  short_description: "Scan agent skills for security issues."
+  default_prompt: "Use $skill-scanner-review to scan a skill directory, summarize findings by severity, and separate likely real threats from probable false positives."
+
+policy:
+  allow_implicit_invocation: true

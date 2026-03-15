@@ -1,0 +1,442 @@
+{
+  "name": "AI Deals Monitor v2 (Postgres Delta)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "id": "4b8a8e3f-1b24-4900-97e9-fbf57fd0f001",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1760,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into monitor_runs (mode, status) values ('{{$env.DEALS_MONITOR_MODE || \"MODE_A\"}}', 'running') returning id, mode, run_started_at;"
+      },
+      "id": "f2fdc8aa-a00c-4f52-a6c7-55568b81d002",
+      "name": "Create Run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1520,
+        320
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "replace-postgres-credential-id",
+          "name": "Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const run = $json;\nconst services = [\n  'ChatGPT', 'Claude', 'Gemini', 'Cursor', 'Midjourney', 'ElevenLabs',\n  'Perplexity', 'Runway', 'HeyGen', 'Mistral', 'Replit', 'n8n'\n];\nconst sources = [\n  { service: 'ChatGPT', source: 'official_pricing', url: 'https://chatgpt.com/pricing' },\n  { service: 'Claude', source: 'official_pricing', url: 'https://www.anthropic.com/pricing' },\n  { service: 'Gemini', source: 'official_pricing', url: 'https://one.google.com/about/ai-premium/' },\n  { service: 'AppSumo', source: 'deal_marketplace', url: 'https://appsumo.com/search/?q=AI' },\n  { service: 'StackSocial', source: 'deal_marketplace', url: 'https://www.stacksocial.com/search?query=ai' },\n  { service: 'Reddit ChatGPT', source: 'community_json', url: 'https://www.reddit.com/r/ChatGPT.json' }\n];\nreturn sources.map((item) => ({\n  json: {\n    run_id: run.id,\n    mode: run.mode,\n    services,\n    current_date: new Date().toISOString(),\n    ...item,\n  }\n}));"
+      },
+      "id": "db18fc0e-f1fd-41c5-b4ef-6fbde87f2003",
+      "name": "Build Sources",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1280,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "AI Deals Monitor v2"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json,text/html,application/rss+xml,application/xml;q=0.9,*/*;q=0.8"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "59431426-2d84-4f4c-9b62-d5efa2f8b004",
+      "name": "Fetch Source",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1040,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body;\nconst raw = typeof body === 'string' ? body : JSON.stringify(body ?? {});\nconst clean = raw\n  .replace(/<script[\\s\\S]*?<\\/script>/gi, ' ')\n  .replace(/<style[\\s\\S]*?<\\/style>/gi, ' ')\n  .replace(/<[^>]+>/g, ' ')\n  .replace(/\\s+/g, ' ')\n  .trim();\nconst content = clean.slice(0, 12000);\nconst normalizedUrl = ($json.url || '').replace(/\\?.*$/, '');\nconst contentHash = require('crypto').createHash('sha256').update(`${$json.service}|${$json.source}|${normalizedUrl}|${content.slice(0, 4000)}`).digest('hex');\nreturn [{ json: {\n  run_id: $json.run_id,\n  mode: $json.mode,\n  current_date: $json.current_date,\n  service: $json.service,\n  source: $json.source,\n  source_url: $json.url,\n  normalized_url: normalizedUrl,\n  raw_text: content,\n  content_hash: contentHash,\n  title: `${$json.service} / ${$json.source}`,\n  price_before: '',\n  price_now: '',\n  discount_text: '',\n  deal_type: 'unknown',\n  score_hint: 0,\n}}];"
+      },
+      "id": "98eb7822-b802-4ceb-b0e1-a9f4057ee005",
+      "name": "Normalize + Hash",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -800,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items = $input.all().map((x) => x.json);\nconst first = items[0] || {};\nreturn [{ json: {\n  run_id: first.run_id,\n  mode: first.mode,\n  current_date: first.current_date,\n  raw_items_json: JSON.stringify(items),\n}}];"
+      },
+      "id": "6e888daf-dae5-4d3b-a0e9-09bd4a44e006",
+      "name": "Aggregate Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -560,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "select coalesce((select summary_text from reports order by report_date desc limit 1), '') as prev_report,\n       coalesce(json_agg(json_build_object(\n         'id', id,\n         'service', service,\n         'source', source,\n         'source_url', source_url,\n         'title', title,\n         'deal_type', deal_type,\n         'price_before', price_before,\n         'price_now', price_now,\n         'discount_text', discount_text,\n         'score', score,\n         'status', status,\n         'content_hash', content_hash,\n         'last_seen_at', last_seen_at\n       )) filter (where status = 'active'), '[]'::json) as active_deals\nfrom deals;"
+      },
+      "id": "e50e39af-3c7c-46fe-bbe5-7cd7e5fcb007",
+      "name": "Load Previous Data",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -320,
+        320
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "replace-postgres-credential-id",
+          "name": "Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const aggregated = $('Aggregate Items').first().json;\nconst previous = $json;\nreturn [{ json: {\n  run_id: aggregated.run_id,\n  mode: aggregated.mode,\n  current_date: aggregated.current_date,\n  prev_report: previous.prev_report || '',\n  active_deals_json: JSON.stringify(previous.active_deals || []),\n  raw_items_json: aggregated.raw_items_json,\n}}];"
+      },
+      "id": "0d4cb2f6-75dd-4e2e-a5a3-2ffb41112a08",
+      "name": "Prepare AI Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/responses",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.OPENAI_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-4.1-mini\",\n  \"input\": [\n    {\n      \"role\": \"system\",\n      \"content\": [\n        {\n          \"type\": \"input_text\",\n          \"text\": \"You are AI Deals Monitor. Detect valid AI tool deals, discounts, promo codes, lifetime deals, and pricing changes. Ignore stale, duplicate, vague, or unverifiable offers. Compare RAW_ITEMS_JSON against ACTIVE_DEALS_JSON and PREV_REPORT. Return strict JSON with summary, top_deals, expired, notes. Each top_deal must include: rank, service, title, deal_type, price_before, price_now, discount_text, score, status, why_it_matters, source_url, content_hash.\"\n        }\n      ]\n    },\n    {\n      \"role\": \"user\",\n      \"content\": [\n        {\n          \"type\": \"input_text\",\n          \"text\": \"CURRENT_DATE: {{$json.current_date}}\\nMODE: {{$json.mode}}\\nPREV_REPORT: {{$json.prev_report}}\\nACTIVE_DEALS_JSON: {{$json.active_deals_json}}\\nRAW_ITEMS_JSON: {{$json.raw_items_json}}\"\n        }\n      ]\n    }\n  ],\n  \"text\": {\n    \"format\": {\n      \"type\": \"json_schema\",\n      \"name\": \"ai_deals_report_v2\",\n      \"schema\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"summary\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"date\": { \"type\": \"string\" },\n              \"top_deals_count\": { \"type\": \"integer\" },\n              \"new_count\": { \"type\": \"integer\" },\n              \"changed_count\": { \"type\": \"integer\" },\n              \"expired_count\": { \"type\": \"integer\" }\n            },\n            \"required\": [\"date\", \"top_deals_count\", \"new_count\", \"changed_count\", \"expired_count\"],\n            \"additionalProperties\": false\n          },\n          \"top_deals\": {\n            \"type\": \"array\",\n            \"items\": {\n              \"type\": \"object\",\n              \"properties\": {\n                \"rank\": { \"type\": \"integer\" },\n                \"service\": { \"type\": \"string\" },\n                \"title\": { \"type\": \"string\" },\n                \"deal_type\": { \"type\": \"string\" },\n                \"price_before\": { \"type\": \"string\" },\n                \"price_now\": { \"type\": \"string\" },\n                \"discount_text\": { \"type\": \"string\" },\n                \"score\": { \"type\": \"integer\" },\n                \"status\": { \"type\": \"string\" },\n                \"why_it_matters\": { \"type\": \"string\" },\n                \"source_url\": { \"type\": \"string\" },\n                \"content_hash\": { \"type\": \"string\" }\n              },\n              \"required\": [\"rank\", \"service\", \"title\", \"deal_type\", \"price_before\", \"price_now\", \"discount_text\", \"score\", \"status\", \"why_it_matters\", \"source_url\", \"content_hash\"],\n              \"additionalProperties\": false\n            }\n          },\n          \"expired\": {\n            \"type\": \"array\",\n            \"items\": {\n              \"type\": \"object\",\n              \"properties\": {\n                \"content_hash\": { \"type\": \"string\" },\n                \"title\": { \"type\": \"string\" }\n              },\n              \"required\": [\"content_hash\", \"title\"],\n              \"additionalProperties\": false\n            }\n          },\n          \"notes\": {\n            \"type\": \"array\",\n            \"items\": { \"type\": \"string\" }\n          }\n        },\n        \"required\": [\"summary\", \"top_deals\", \"expired\", \"notes\"],\n        \"additionalProperties\": false\n      }\n    }\n  }\n}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "52d56bf4-60f1-4b29-b3e6-e33bdd3c9009",
+      "name": "OpenAI Analyze",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        160,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const responseBody = $json.body ?? {};\nlet content = responseBody.output_text;\nif (!content && Array.isArray(responseBody.output)) {\n  const textChunks = [];\n  for (const item of responseBody.output) {\n    if (!Array.isArray(item.content)) continue;\n    for (const part of item.content) {\n      if (part.type === 'output_text' && part.text) textChunks.push(part.text);\n    }\n  }\n  content = textChunks.join('\\n');\n}\nlet report;\ntry {\n  report = typeof content === 'string' ? JSON.parse(content) : content;\n} catch (error) {\n  report = {\n    summary: { date: new Date().toISOString().slice(0, 10), top_deals_count: 0, new_count: 0, changed_count: 0, expired_count: 0 },\n    top_deals: [], expired: [], notes: ['Invalid OpenAI JSON', String(error.message || error)]\n  };\n}\nconst runId = $('Prepare AI Payload').first().json.run_id;\nconst topDeals = Array.isArray(report.top_deals) ? report.top_deals : [];\nconst expired = Array.isArray(report.expired) ? report.expired : [];\nconst lines = ['AI TOOLS DEAL MONITOR', `Date: ${report.summary?.date || new Date().toISOString().slice(0, 10)}`, '', 'Top deals today:'];\nif (!topDeals.length) lines.push('No high-confidence deals found.');\nfor (const deal of topDeals.slice(0, 5)) {\n  lines.push(`${deal.rank}. ${deal.service} — ${deal.title} (${deal.discount_text})`);\n}\nlines.push('', `New deals: ${report.summary?.new_count ?? 0}`, `Changed: ${report.summary?.changed_count ?? 0}`, `Expired: ${report.summary?.expired_count ?? 0}`);\nreturn [{ json: { run_id: runId, report, telegram_text: lines.join('\\n'), top_deals_json: JSON.stringify(topDeals), expired_json: JSON.stringify(expired) } }];"
+      },
+      "id": "ea67f56f-93e8-4448-b506-0145b6f04010",
+      "name": "Parse Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        400,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "with ranked_deals as (\n  select\n    '{{$json.run_id}}'::uuid as run_id,\n    jsonb_array_elements('{{$json.top_deals_json}}'::jsonb) as item\n), upserted as (\n  insert into deals (\n    service, source, source_url, title, deal_type, price_before, price_now,\n    discount_text, score, status, content_hash, last_run_id, first_seen_at, last_seen_at\n  )\n  select\n    item->>'service',\n    'llm_analysis',\n    item->>'source_url',\n    item->>'title',\n    item->>'deal_type',\n    item->>'price_before',\n    item->>'price_now',\n    item->>'discount_text',\n    coalesce((item->>'score')::int, 0),\n    'active',\n    item->>'content_hash',\n    run_id,\n    now(),\n    now()\n  from ranked_deals\n  on conflict (content_hash)\n  do update set\n    title = excluded.title,\n    price_before = excluded.price_before,\n    price_now = excluded.price_now,\n    discount_text = excluded.discount_text,\n    score = excluded.score,\n    status = 'active',\n    last_run_id = excluded.last_run_id,\n    last_seen_at = now()\n  returning id, content_hash\n)\ninsert into deal_events (deal_id, run_id, event_type, payload)\nselect u.id, '{{$json.run_id}}'::uuid, 'observed', jsonb_build_object('content_hash', u.content_hash)\nfrom upserted u;"
+      },
+      "id": "83be60f5-b766-46bf-bbc8-58fb1a375011",
+      "name": "Upsert Deals",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        640,
+        320
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "replace-postgres-credential-id",
+          "name": "Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "update deals\nset status = 'expired', expired_at = now(), last_run_id = '{{$json.run_id}}'::uuid\nwhere status = 'active'\n  and content_hash in (\n    select item->>'content_hash'\n    from jsonb_array_elements('{{$json.expired_json}}'::jsonb) item\n  );"
+      },
+      "id": "a5fc314a-d6a8-4718-9af7-9fd278fe7012",
+      "name": "Expire Missing Deals",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        880,
+        320
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "replace-postgres-credential-id",
+          "name": "Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "insert into reports (run_id, report_date, summary_text, report_json, new_count, changed_count, expired_count)\nvalues (\n  '{{$json.run_id}}'::uuid,\n  current_date,\n  '{{$json.telegram_text.replace(/'/g, \"''\")}}',\n  '{{$json.report ? JSON.stringify($json.report).replace(/'/g, \"''\") : '{}'}}'::jsonb,\n  {{$json.report.summary.new_count || 0}},\n  {{$json.report.summary.changed_count || 0}},\n  {{$json.report.summary.expired_count || 0}}\n);\n\nupdate monitor_runs\nset status = 'completed',\n    run_finished_at = now(),\n    normalized_items_count = {{ $json.report.summary.top_deals_count || 0 }}\nwhere id = '{{$json.run_id}}'::uuid;"
+      },
+      "id": "c0d9d4a0-c45f-4556-8005-8af5b91ca012",
+      "name": "Insert Report + Finish Run",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        1120,
+        320
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "replace-postgres-credential-id",
+          "name": "Postgres"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{$env.TELEGRAM_BOT_TOKEN}}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{$env.TELEGRAM_CHAT_ID}}\",\n  \"text\": $json.telegram_text\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "9c6d7217-f864-4bac-9ef5-f31ba31b7013",
+      "name": "Send Telegram Report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1360,
+        320
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Create Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Run": {
+      "main": [
+        [
+          {
+            "node": "Build Sources",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Sources": {
+      "main": [
+        [
+          {
+            "node": "Fetch Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Source": {
+      "main": [
+        [
+          {
+            "node": "Normalize + Hash",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize + Hash": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Items": {
+      "main": [
+        [
+          {
+            "node": "Load Previous Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Previous Data": {
+      "main": [
+        [
+          {
+            "node": "Prepare AI Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare AI Payload": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Analyze",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Analyze": {
+      "main": [
+        [
+          {
+            "node": "Parse Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Report": {
+      "main": [
+        [
+          {
+            "node": "Upsert Deals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upsert Deals": {
+      "main": [
+        [
+          {
+            "node": "Expire Missing Deals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expire Missing Deals": {
+      "main": [
+        [
+          {
+            "node": "Insert Report + Finish Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Insert Report + Finish Run": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "active": false,
+  "versionId": "d6d12255-9170-4718-b2cb-c1c4e9df1000",
+  "tags": []
+}

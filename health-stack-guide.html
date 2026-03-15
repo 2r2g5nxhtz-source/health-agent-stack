@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Health Stack - Гайд по установке</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #ffffff;
+    --bg2: #f5f5f4;
+    --bg3: #eeece8;
+    --text: #1a1a18;
+    --text2: #6b6b67;
+    --text3: #9a9a96;
+    --border: rgba(0,0,0,0.10);
+    --border2: rgba(0,0,0,0.18);
+    --blue-bg: #e6f1fb;
+    --blue-text: #185fa5;
+    --green-bg: #eaf3de;
+    --green-text: #3b6d11;
+    --amber-bg: #faeeda;
+    --amber-text: #854f0b;
+    --teal-bg: #e1f5ee;
+    --teal-text: #0f6e56;
+    --purple-bg: #eeedfe;
+    --purple-text: #534ab7;
+    --coral-bg: #faece7;
+    --coral-text: #993c1d;
+    --success-bg: #eaf3de;
+    --success-text: #3b6d11;
+    --success-border: rgba(59,109,17,0.25);
+    --mono: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    --sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1a;
+      --bg2: #252523;
+      --bg3: #2e2e2b;
+      --text: #f0ede8;
+      --text2: #9a9a96;
+      --text3: #6b6b67;
+      --border: rgba(255,255,255,0.10);
+      --border2: rgba(255,255,255,0.18);
+      --blue-bg: #042c53;
+      --blue-text: #85b7eb;
+      --green-bg: #173404;
+      --green-text: #97c459;
+      --amber-bg: #412402;
+      --amber-text: #fac775;
+      --teal-bg: #04342c;
+      --teal-text: #5dcaa5;
+      --purple-bg: #26215c;
+      --purple-text: #afa9ec;
+      --coral-bg: #4a1b0c;
+      --coral-text: #f0997b;
+      --success-bg: #173404;
+      --success-text: #97c459;
+      --success-border: rgba(151,196,89,0.25);
+    }
+  }
+
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    padding: 2rem 1rem 4rem;
+  }
+
+  .container { max-width: 720px; margin: 0 auto; }
+
+  header { margin-bottom: 2.5rem; }
+  header h1 { font-size: 22px; font-weight: 500; margin-bottom: 6px; }
+  header p { font-size: 14px; color: var(--text2); }
+
+  .meta { display: flex; gap: 12px; margin-top: 10px; flex-wrap: wrap; }
+  .pill {
+    font-size: 12px; padding: 3px 10px; border-radius: 20px;
+    border: 0.5px solid var(--border);
+    background: var(--bg2); color: var(--text2);
+  }
+  .pill.free { background: var(--green-bg); color: var(--green-text); border-color: transparent; }
+
+  .phase { margin-bottom: 2.5rem; }
+
+  .phase-header {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 1rem;
+  }
+  .phase-num {
+    width: 30px; height: 30px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 500; flex-shrink: 0;
+  }
+  .phase-title { font-size: 16px; font-weight: 500; }
+  .phase-badge {
+    font-size: 11px; padding: 2px 8px; border-radius: 4px;
+    margin-left: auto; flex-shrink: 0;
+  }
+
+  .step {
+    background: var(--bg2);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    margin-bottom: 8px;
+  }
+  .step-label {
+    font-size: 11px; color: var(--text3);
+    text-transform: uppercase; letter-spacing: 0.05em;
+    margin-bottom: 4px;
+  }
+  .step-desc { font-size: 14px; color: var(--text2); margin-bottom: 10px; }
+  .step-desc:last-child { margin-bottom: 0; }
+
+  .cmd-wrap { position: relative; }
+  .cmd {
+    background: var(--bg);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 10px 80px 10px 14px;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-all;
+    cursor: pointer;
+    transition: border-color 0.15s;
+    user-select: all;
+  }
+  .cmd:hover { border-color: var(--blue-text); }
+
+  .copy-btn {
+    position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+    font-size: 11px; font-family: var(--sans);
+    background: var(--bg2); color: var(--text2);
+    border: 0.5px solid var(--border);
+    border-radius: 4px; padding: 3px 10px;
+    cursor: pointer; transition: all 0.15s;
+  }
+  .copy-btn:hover { color: var(--blue-text); border-color: var(--blue-text); }
+  .copy-btn.ok { color: var(--green-text); border-color: var(--success-border); }
+
+  .note {
+    font-size: 12px; color: var(--text2);
+    margin-top: 8px; padding-left: 10px;
+    border-left: 2px solid var(--border2);
+    line-height: 1.5;
+  }
+
+  .divider { border: none; border-top: 0.5px solid var(--border); margin: 2rem 0; }
+
+  .result-card {
+    border: 0.5px solid var(--success-border);
+    border-radius: var(--radius-lg);
+    padding: 14px 16px;
+    background: var(--success-bg);
+  }
+  .result-card .title {
+    font-size: 13px; font-weight: 500;
+    color: var(--success-text); margin-bottom: 10px;
+  }
+  .result-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 7px 0;
+    border-bottom: 0.5px solid rgba(0,0,0,0.06);
+    font-size: 13px;
+  }
+  .result-row:last-child { border-bottom: none; }
+  .result-row .name { color: var(--text); }
+  .result-url {
+    font-family: var(--mono); font-size: 12px;
+    color: var(--blue-text);
+    background: var(--bg2);
+    padding: 2px 8px; border-radius: 4px;
+  }
+
+  .warning-box {
+    background: var(--amber-bg);
+    border: 0.5px solid rgba(133,79,11,0.2);
+    border-radius: var(--radius);
+    padding: 12px 16px;
+    font-size: 13px; color: var(--amber-text);
+    margin-bottom: 2rem;
+  }
+  .warning-box strong { font-weight: 500; }
+
+  footer {
+    margin-top: 3rem;
+    font-size: 12px; color: var(--text3);
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>Health Stack - установка на MacBook M3 Max</h1>
+    <p>n8n · Ollama · Open WebUI - локально, без подписок</p>
+    <div class="meta">
+      <span class="pill">~30 минут</span>
+      <span class="pill free">$0 навсегда</span>
+      <span class="pill">macOS · Apple Silicon</span>
+      <span class="pill">базовый терминал</span>
+    </div>
+  </header>
+
+  <div class="warning-box">
+    <strong>Важно про n8n:</strong> твой текущий триал - это облачная платная версия (€24/мес после 14 дней).
+    Self-hosted Community Edition - бесплатна навсегда. Все воркфлоу можно экспортировать из облака и импортировать локально.
+  </div>
+
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-num" style="background:var(--blue-bg);color:var(--blue-text)">1</div>
+      <span class="phase-title">Homebrew - менеджер пакетов</span>
+      <span class="phase-badge" style="background:var(--blue-bg);color:var(--blue-text)">~2 мин</span>
+    </div>
+
+    <div class="step">
+      <div class="step-label">Шаг 1 - открой Terminal</div>
+      <div class="step-desc">Cmd + Space → напиши «Terminal» → Enter</div>
+    </div>
+
+    <div class="step">
+      <div class="step-label">Шаг 2 - установи Homebrew</div>
+      <div class="step-desc">Вставь команду и нажми Enter. Попросит пароль - введи, это нормально.</div>
+      <div class="cmd-wrap">
+        <div class="cmd">/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"</div>
+        <button class="copy-btn" onclick="copy(this, '/bin/bash -c &quot;$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)&quot;')">копировать</button>
+      </div>
+      <div class="note">Ждёт ~2 минуты. В конце напишет "Installation successful!"</div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-num" style="background:var(--teal-bg);color:var(--teal-text)">2</div>
+      <span class="phase-title">Docker Desktop</span>
+      <span class="phase-badge" style="background:var(--teal-bg);color:var(--teal-text)">~5 мин</span>
+    </div>
+
+    <div class="step">
+      <div class="step-label">Шаг 3 - установи Docker</div>
+      <div class="cmd-wrap">
+        <div class="cmd">brew install --cask docker</div>
+        <button class="copy-btn" onclick="copy(this, 'brew install --cask docker')">копировать</button>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-label">Шаг 4 - запусти Docker Desktop</div>
+      <div class="step-desc">Открой через Finder → Applications → Docker. Дождись иконки кита в меню-баре сверху. На все запросы разрешений - Allow.</div>
+    </div>
+
+    <div class="step">
+      <div class="step-label">Шаг 5 - проверь</div>
+      <div class="cmd-wrap">
+        <div class="cmd">docker --version</div>
+        <button class="copy-btn" onclick="copy(this, 'docker --version')">копировать</button>
+      </div>
+      <div class="note">Должно написать: Docker version 27.x.x или выше</div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-num" style="background:var(--green-bg);color:var(--green-text)">3</div>
+      <span class="phase-title">n8n self-hosted <span style="font-size:11px;padding:2px 7px;border-radius:4px;background:var(--green-bg);color:var(--green-text);border:0.5px solid var(--success-border);margin-left:6px">бесплатно навсегда</span></span>
+      <span class="phase-badge" style="background:var(--green-bg);color:var(--green-text)">~3 мин</span>
+    </div>
+
+    <div class="step">
+      <div class="step-label">Шаг 6 - создай рабочую папку</div>
+      <div class="cmd-wrap">
+        <div class="cmd">mkdir -p ~/selfhosted/n8n && cd ~/selfhosted/n8n</div>
+        <button class="copy-btn" onclick="copy(this, 'mkdir -p ~/selfhosted/n8n && cd ~/selfhosted/n8n')">копировать</button>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-label">Шаг 7 - запусти n8n</div>
+      <div class="step-desc">Скачает образ (~300 MB, один раз) и запустит в фоне.</div>
+      <div class="cmd-wrap">
+        <div class="cmd">docker run -d --name n8n -p 5678:5678 --restart unless-stopped -v n8n_data:/home/node/.n8n docker.n8n.io/n8nio/n8n</div>
+        <button class="copy-btn" onclick="copy(this, 'docker run -d --name n8n -p 5678:5678 --restart unless-stopped -v n8n_data:/home/node/.n8n docker.n8n.io/n8nio/n8n')">копировать</button>
+      </div>
+      <div class="note">Флаг --restart unless-stopped означает: n8n запустится автоматически после перезагрузки Mac (если Docker Desktop тоже настроен на автозапуск).</div>
+    </div>
+
+    <div class="result-card" style="margin-top:10px">
+      <div class="result-row">
+        <span class="name">n8n открывается по адресу</span>
+        <span class="result-url">localhost:5678</span>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-num" style="background:var(--amber-bg);color:var(--amber-text)">4</div>
+      <span class="phase-title">Ollama - локальный AI</span>
+      <span class="phase-badge" style="background:var(--amber-bg);color:var(--amber-text)">~5 мин</span>
+    </div>
+
+    <div class="step">
+      <div class="step-label">Шаг 8 - установи Ollama</div>
+      <div class="cmd-wrap">
+        <div class="cmd">brew install ollama</div>
+        <button class="copy-btn" onclick="copy(this, 'brew install ollama')">копировать</button>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-label">Шаг 9 - запусти и скачай модель</div>
+      <div class="step-desc">llama3.2 - лёгкая (~2 GB), быстрая на M3, хорошо понимает русский. Медданные не уходят в облако.</div>
+      <div class="cmd-wrap">
+        <div class="cmd">ollama serve &amp; sleep 3 &amp;&amp; ollama pull llama3.2</div>
+        <button class="copy-btn" onclick="copy(this, 'ollama serve & sleep 3 && ollama pull llama3.2')">копировать</button>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-num" style="background:var(--coral-bg);color:var(--coral-text)">5</div>
+      <span class="phase-title">Open WebUI - интерфейс к Ollama</span>
+      <span class="phase-badge" style="background:var(--coral-bg);color:var(--coral-text)">~2 мин</span>
+    </div>
+
+    <div class="step">
+      <div class="step-label">Шаг 10 - запусти Open WebUI</div>
+      <div class="cmd-wrap">
+        <div class="cmd">docker run -d -p 3000:8080 --add-host=host.docker.internal:host-gateway --restart unless-stopped -v open-webui:/app/backend/data --name open-webui ghcr.io/open-webui/open-webui:main</div>
+        <button class="copy-btn" onclick="copy(this, 'docker run -d -p 3000:8080 --add-host=host.docker.internal:host-gateway --restart unless-stopped -v open-webui:/app/backend/data --name open-webui ghcr.io/open-webui/open-webui:main')">копировать</button>
+      </div>
+    </div>
+
+    <div class="result-card" style="margin-top:10px">
+      <div class="result-row">
+        <span class="name">Open WebUI</span>
+        <span class="result-url">localhost:3000</span>
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <div class="phase">
+    <div class="phase-header">
+      <div class="phase-num" style="background:var(--purple-bg);color:var(--purple-text)">6</div>
+      <span class="phase-title">Управление стеком</span>
+    </div>
+
+    <div class="step">
+      <div class="step-label">Запустить всё (после перезагрузки Mac)</div>
+      <div class="cmd-wrap">
+        <div class="cmd">docker start n8n open-webui &amp;&amp; ollama serve &amp;</div>
+        <button class="copy-btn" onclick="copy(this, 'docker start n8n open-webui && ollama serve &')">копировать</button>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-label">Остановить всё</div>
+      <div class="cmd-wrap">
+        <div class="cmd">docker stop n8n open-webui</div>
+        <button class="copy-btn" onclick="copy(this, 'docker stop n8n open-webui')">копировать</button>
+      </div>
+    </div>
+
+    <div class="step">
+      <div class="step-label">Посмотреть статус</div>
+      <div class="cmd-wrap">
+        <div class="cmd">docker ps</div>
+        <button class="copy-btn" onclick="copy(this, 'docker ps')">копировать</button>
+      </div>
+      <div class="note">Должны быть видны n8n и open-webui со статусом "Up"</div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <div class="result-card">
+    <div class="title">После установки у тебя будет</div>
+    <div class="result-row">
+      <span class="name">n8n - автоматизация, Apple Health webhook</span>
+      <span class="result-url">localhost:5678</span>
+    </div>
+    <div class="result-row">
+      <span class="name">Ollama - локальный AI (llama3.2)</span>
+      <span class="result-url">localhost:11434</span>
+    </div>
+    <div class="result-row">
+      <span class="name">Open WebUI - чат с локальным AI</span>
+      <span class="result-url">localhost:3000</span>
+    </div>
+  </div>
+
+  <footer>Health Agent · Мердан Башимов · MacBook M3 Max · 2026</footer>
+
+</div>
+<script>
+function copy(btn, text) {
+  const t = text || btn.previousElementSibling.innerText.trim();
+  navigator.clipboard.writeText(t).then(() => {
+    btn.textContent = 'скопировано';
+    btn.classList.add('ok');
+    setTimeout(() => { btn.textContent = 'копировать'; btn.classList.remove('ok'); }, 1600);
+  });
+}
+document.querySelectorAll('.cmd').forEach(el => {
+  el.addEventListener('click', () => {
+    const btn = el.nextElementSibling;
+    navigator.clipboard.writeText(el.innerText.trim()).then(() => {
+      if (btn) { btn.textContent = 'скопировано'; btn.classList.add('ok'); setTimeout(() => { btn.textContent = 'копировать'; btn.classList.remove('ok'); }, 1600); }
+    });
+  });
+});
+</script>
+</body>
+</html>
