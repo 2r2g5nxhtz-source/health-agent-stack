@@ -1,0 +1,28 @@
+.DS_Store
+.env
+.env.local
+.env.*.local
+.playwright-cli/
+node_modules/
+dist/
+build/
+coverage/
+.idea/
+.vscode/
+*.log
+
+# Xcode / Apple
+DerivedData/
+xcuserdata/
+*.xcuserstate
+*.xcscmblueprint
+ios/**/build/
+
+# Secrets and local overrides
+*.p8
+*.mobileprovision
+*.cer
+*.key
+*.pem
+*.crt
+
