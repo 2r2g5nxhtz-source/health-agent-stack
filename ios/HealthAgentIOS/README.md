@@ -9,6 +9,18 @@
 - отправляет JSON на настраиваемый webhook `n8n`
 - может отправлять заголовок `X-Health-Agent-Secret` для защищённого webhook
 
+Обычный webhook:
+
+```text
+https://YOUR_N8N_HOST/webhook/apple-health
+```
+
+Защищённый webhook:
+
+```text
+https://YOUR_N8N_HOST/webhook/apple-health-secure
+```
+
 ## Payload
 
 ```json
@@ -70,3 +82,4 @@ EXPORT_OPTIONS_PLIST="$PWD/export/ExportOptions.app-store.plist" ./scripts/expor
 - webhook `n8n` активен
 - в приложении введён ваш собственный webhook URL
 - если используется secure workflow, в приложении указан тот же shared secret
+- после import secure workflow в `n8n 2.x` выполнены publish + restart

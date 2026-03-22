@@ -41,6 +41,12 @@ For local testing on your LAN, an HTTP URL is acceptable if you trust the networ
 http://YOUR_LOCAL_IP:5678/webhook/apple-health
 ```
 
+Secure workflow example:
+
+```text
+https://YOUR_N8N_HOST/webhook/apple-health-secure
+```
+
 ## 2. Open the iPhone app
 
 ```bash
@@ -97,8 +103,10 @@ Webhook
 Suggested first thresholds:
 
 - `heart_rate > 85`
-- `glucose > 110`
+- `glucose_mmol > 6.0`
 - `sleep_hours < 6`
+
+The secure workflow converts incoming glucose from `mg/dL` to `mmol/L` by dividing by `18` before threshold checks.
 
 ## 6. Export an IPA if needed
 
@@ -135,6 +143,14 @@ Optional overrides:
 WEBHOOK_URL="http://127.0.0.1:5678/webhook/apple-health" ./scripts/smoke-test.sh
 HEALTH_SECRET="your-secret" ./scripts/smoke-test.sh
 N8N_CONTAINER="n8n" ./scripts/smoke-test.sh
+```
+
+Secure workflow example:
+
+```bash
+WEBHOOK_URL="http://127.0.0.1:5678/webhook/apple-health-secure" \
+HEALTH_SECRET="your-secret" \
+./scripts/smoke-test.sh
 ```
 
 The smoke test checks:
