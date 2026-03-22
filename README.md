@@ -156,6 +156,10 @@ Contributions, issues, and improvements are welcome.
 - Apple Health data stays on your Apple devices and your own infrastructure unless you choose otherwise.
 - Telegram and CSV processing happen downstream in your own automation stack.
 
+### n8n 2.x
+
+For n8n 2.x, keep an explicit `webhookId` on webhook nodes and publish the workflow after import. After publishing, restart n8n and run `scripts/smoke-test.sh` to confirm the production webhook is registered and reachable.
+
 ## License
 
 MIT. See [`LICENSE`](./LICENSE).

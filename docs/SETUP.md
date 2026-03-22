@@ -18,6 +18,13 @@ It does not use the archived `AI Deals Monitor` assets under `legacy/ai-deals-mo
 - `xcodegen` installed if you want to regenerate the Xcode project
 - a running `n8n` instance reachable from your iPhone
 
+## Important for n8n 2.x
+
+- keep an explicit `webhookId` on the webhook node
+- after importing a workflow, publish it
+- restart n8n after publishing
+- run `scripts/smoke-test.sh` before using the iPhone app
+
 ## 1. Prepare the webhook endpoint
 
 Create or choose an `n8n` webhook that accepts `POST` requests with JSON.
