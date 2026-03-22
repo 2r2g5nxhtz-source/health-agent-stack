@@ -1,0 +1,171 @@
+{
+  "name": "Health Agent Daily Summary",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "id": "da110001-0000-4000-a000-000000000001",
+      "name": "Morning Schedule (08:00)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-800, 200]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 21 * * *"
+            }
+          ]
+        }
+      },
+      "id": "da110002-0000-4000-a000-000000000002",
+      "name": "Evening Check (21:00)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-800, 500]
+    },
+    {
+      "parameters": {
+        "command": "tail -n 200 /data/health-agent/health-log.csv 2>/dev/null || echo ''"
+      },
+      "id": "da110003-0000-4000-a000-000000000003",
+      "name": "Read CSV (Morning)",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [-600, 200]
+    },
+    {
+      "parameters": {
+        "command": "tail -n 200 /data/health-agent/health-log.csv 2>/dev/null || echo ''"
+      },
+      "id": "da110004-0000-4000-a000-000000000004",
+      "name": "Read CSV (Evening)",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [-600, 500]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = ($json.stdout || '').trim();\nconst allLines = raw.split('\\n').filter(l => l && !l.startsWith('received_at'));\n\nif (allLines.length === 0) {\n  return [{\n    json: {\n      telegram_text: '\\u{1F4CA} Утренняя сводка\\n\\nДанных пока нет. Открой Health Agent и нажми Send Now.',\n      has_data: false,\n    }\n  }];\n}\n\nfunction parseLine(line) {\n  // Last field (alerts) is quoted and may contain commas\n  const alertsMatch = line.match(/,\"([^\"]*)\"$/);\n  const alertsStr = alertsMatch ? alertsMatch[1] : '';\n  const core = alertsMatch ? line.slice(0, line.length - alertsMatch[0].length) : line;\n  const parts = core.split(',');\n  return {\n    received_at: parts[0] || '',\n    timestamp:   parts[1] || '',\n    heart_rate:  parts[2] ? parseFloat(parts[2]) : null,\n    glucose_raw: parts[3] ? parseFloat(parts[3]) : null,\n    glucose_mmol:parts[4] ? parseFloat(parts[4]) : null,\n    weight:      parts[5] ? parseFloat(parts[5]) : null,\n    sleep_hours: parts[6] ? parseFloat(parts[6]) : null,\n    alert_count: parts[7] ? parseInt(parts[7])   : 0,\n    alerts: alertsStr,\n  };\n}\n\nconst latest = parseLine(allLines[allLines.length - 1]);\nconst todayUTC = new Date().toISOString().slice(0, 10);\nconst latestDate = latest.received_at ? latest.received_at.slice(0, 10) : '';\nconst isToday = latestDate === todayUTC;\n\nconst tz = $env.TZ || 'UTC';\nconst receivedTime = latest.received_at\n  ? new Date(latest.received_at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', timeZone: tz })\n  : '';\n\nconst lines = ['\\u{1F4CA} Утренняя сводка', ''];\n\nif (isToday) {\n  lines.push(`Последние данные сегодня в ${receivedTime}`);\n} else {\n  lines.push(`\\u26A0\\uFE0F Сегодняшних данных ещё нет. Последний замер: ${latestDate || 'неизвестно'}`);\n}\n\nlines.push('');\n\nif (latest.heart_rate !== null)\n  lines.push(`\\u2764\\uFE0F Пульс: ${latest.heart_rate} уд/мин${latest.heart_rate > 85 ? ' \\u26A0\\uFE0F' : ' \\u2705'}`);\nif (latest.glucose_mmol !== null)\n  lines.push(`\\u{1FA78} Глюкоза: ${latest.glucose_mmol.toFixed(1)} ммоль/л${latest.glucose_mmol > 6.0 ? ' \\u26A0\\uFE0F' : ' \\u2705'}`);\nif (latest.weight !== null)\n  lines.push(`\\u2696\\uFE0F Вес: ${latest.weight} кг`);\nif (latest.sleep_hours !== null)\n  lines.push(`\\u{1F634} Сон: ${latest.sleep_hours} ч${latest.sleep_hours < 6 ? ' \\u26A0\\uFE0F' : ' \\u2705'}`);\n\nif (latest.alert_count > 0 && latest.alerts) {\n  lines.push('');\n  lines.push(`\\u{1F534} Нарушения: ${latest.alerts}`);\n}\n\nif (!isToday) {\n  lines.push('');\n  lines.push('Открой приложение Health Agent и нажми Send Now.');\n}\n\nreturn [{\n  json: {\n    telegram_text: lines.join('\\n'),\n    has_data: true,\n    is_today: isToday,\n  }\n}];"
+      },
+      "id": "da110005-0000-4000-a000-000000000005",
+      "name": "Build Morning Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-400, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = ($json.stdout || '').trim();\nconst allLines = raw.split('\\n').filter(l => l && !l.startsWith('received_at'));\n\nconst todayUTC = new Date().toISOString().slice(0, 10);\nconst todayLines = allLines.filter(l => l.startsWith(todayUTC));\n\nconst hasToday = todayLines.length > 0;\nconst shouldSend = !hasToday;\n\nconst telegram_text = shouldSend\n  ? '\\u23F0 Вечернее напоминание\\n\\nБраток, сегодня данные так и не пришли.\\nОткрой Health Agent и нажми Send Now — займёт 5 секунд.'\n  : '';\n\nreturn [{\n  json: {\n    has_today: hasToday,\n    should_send: shouldSend,\n    telegram_text,\n  }\n}];"
+      },
+      "id": "da110006-0000-4000-a000-000000000006",
+      "name": "Check Today Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-400, 500]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.should_send }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "da110007-0000-4000-a000-000000000007",
+      "name": "No Data Today?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-200, 500]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{$env.TELEGRAM_BOT_TOKEN}}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{$env.TELEGRAM_CHAT_ID}}\",\n  \"text\": {{ JSON.stringify($json.telegram_text) }}\n}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "da110008-0000-4000-a000-000000000008",
+      "name": "Send Morning Summary",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-200, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{$env.TELEGRAM_BOT_TOKEN}}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{$env.TELEGRAM_CHAT_ID}}\",\n  \"text\": {{ JSON.stringify($json.telegram_text) }}\n}",
+        "options": { "timeout": 30000 }
+      },
+      "id": "da110009-0000-4000-a000-000000000009",
+      "name": "Send Evening Reminder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [0, 500]
+    }
+  ],
+  "connections": {
+    "Morning Schedule (08:00)": {
+      "main": [
+        [{ "node": "Read CSV (Morning)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Evening Check (21:00)": {
+      "main": [
+        [{ "node": "Read CSV (Evening)", "type": "main", "index": 0 }]
+      ]
+    },
+    "Read CSV (Morning)": {
+      "main": [
+        [{ "node": "Build Morning Summary", "type": "main", "index": 0 }]
+      ]
+    },
+    "Read CSV (Evening)": {
+      "main": [
+        [{ "node": "Check Today Data", "type": "main", "index": 0 }]
+      ]
+    },
+    "Build Morning Summary": {
+      "main": [
+        [{ "node": "Send Morning Summary", "type": "main", "index": 0 }]
+      ]
+    },
+    "Check Today Data": {
+      "main": [
+        [{ "node": "No Data Today?", "type": "main", "index": 0 }]
+      ]
+    },
+    "No Data Today?": {
+      "main": [
+        [{ "node": "Send Evening Reminder", "type": "main", "index": 0 }],
+        []
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "meta": { "templateCredsSetupCompleted": true },
+  "active": false,
+  "versionId": "health-daily-summary-v1",
+  "tags": []
+}

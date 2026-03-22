@@ -161,6 +161,40 @@ The smoke test checks:
 - test payload delivery
 - workflow visibility inside `n8n`
 
+## Daily Summary Workflow
+
+`workflows/health-agent-daily-summary.workflow.json` adds two scheduled Telegram messages:
+
+| Time | Behaviour |
+|---|---|
+| 08:00 | Sends a morning summary with the latest readings (heart rate, glucose, weight, sleep). If today's data has not arrived yet, the message says so and prompts you to open the app. |
+| 21:00 | Sends a reminder only if no data was received that day. Silent if data already arrived. |
+
+### Prerequisites
+
+The daily summary reads the CSV file produced by the secure webhook workflow using an `executeCommand` node. Add this variable to your n8n Docker environment before importing:
+
+```
+N8N_ALLOW_EXEC=true
+```
+
+Without it the `executeCommand` node will fail silently.
+
+### Import and activate
+
+1. Import `health-agent-daily-summary.workflow.json` into n8n
+2. Publish the workflow (same as the webhook workflow — required for n8n 2.x)
+3. Restart n8n
+4. Verify by triggering the `Morning Schedule` node manually in the n8n UI
+
+### Timezone
+
+The workflow uses the `TZ` environment variable to display times in your local timezone. Make sure `TZ` is set in your n8n Docker env (e.g. `TZ=Asia/Dubai`). Defaults to `UTC`.
+
+### CSV path
+
+The workflow reads `/data/health-agent/health-log.csv` by default. This matches `HEALTH_AGENT_CSV_PATH` in the env example. If you changed the path, update the `command` field in both `Read CSV` nodes.
+
 ## Workflow Recovery
 
 If the `n8n` production webhook stops responding after a workflow import or update, run:
