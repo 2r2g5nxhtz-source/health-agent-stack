@@ -1,0 +1,24 @@
+{
+  "webhook_path": "/webhook/apple-health",
+  "method": "POST",
+  "content_type": "application/json",
+  "expected_payload": {
+    "heart_rate": 79,
+    "glucose": 112,
+    "weight": 81.9,
+    "sleep_hours": 5.5,
+    "timestamp": "2026-03-15T08:00:00Z"
+  },
+  "recommended_flow": [
+    "Validate required JSON shape",
+    "Normalize null values",
+    "Check alert thresholds",
+    "Send Telegram alert if needed",
+    "Append to CSV or store in a database"
+  ],
+  "notes": [
+    "Allow null values for missing samples",
+    "Prefer private networking or HTTPS",
+    "Do not expose the webhook publicly without authentication or network controls"
+  ]
+}

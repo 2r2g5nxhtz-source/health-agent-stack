@@ -18,7 +18,7 @@
 		4D3B3B16307F75A4F3EC9EEA /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		570D5352725C1AA1285A3E5C /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		6A8999098624480A36F983AC /* HealthAgentIOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HealthAgentIOSApp.swift; sourceTree = "<group>"; };
-		78F75736647E88BEB5EC9E79 /* HealthAgentIOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = HealthAgentIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		78F75736647E88BEB5EC9E79 /* HealthAgentIOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = HealthAgentIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -110,11 +110,6 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
-				TargetAttributes = {
-					BA9D24F85296B91A189C0067 = {
-						DevelopmentTeam = "";
-					};
-				};
 			};
 			buildConfigurationList = 426D792321ABA0E721BE7A8E /* Build configuration list for PBXProject "HealthAgentIOS" */;
 			developmentRegion = en;
@@ -218,7 +213,7 @@
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = com.merdan.HealthAgentIOS;
+				PRODUCT_BUNDLE_IDENTIFIER = com.healthagent.sourceuser.HealthAgentIOS;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
@@ -279,7 +274,7 @@
 				MARKETING_VERSION = 1.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = com.merdan.HealthAgentIOS;
+				PRODUCT_BUNDLE_IDENTIFIER = com.healthagent.sourceuser.HealthAgentIOS;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
@@ -295,6 +290,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "";
 				CODE_SIGN_ENTITLEMENTS = Resources/HealthAgentIOS.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
@@ -313,6 +309,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = "";
 				CODE_SIGN_ENTITLEMENTS = Resources/HealthAgentIOS.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				DEVELOPMENT_TEAM = "";
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = Resources/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;

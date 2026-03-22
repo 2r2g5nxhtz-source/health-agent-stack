@@ -1,47 +1,64 @@
-# Импорт workflow в n8n
+# Import The Health Workflow
 
-## Файл
+## Workflow File
 
-Готовый export JSON:
+Use:
 
-- `workflows/ai-deals-monitor.workflow.json`
+`workflows/health-agent-webhook.workflow.json`
 
-## Как импортировать
+Advanced version:
 
-1. Открой `n8n`
-2. Нажми `Workflows`
-3. Нажми `Import from file`
-4. Выбери `workflows/ai-deals-monitor.workflow.json`
+`workflows/health-agent-webhook-secure-csv.workflow.json`
 
-## Что нужно настроить после импорта
+## What It Does
 
-Workflow использует env-переменные:
+- receives `POST /webhook/apple-health`
+- normalizes numeric and nullable fields
+- checks simple threshold rules
+- sends a Telegram alert only if:
+  - at least one threshold is triggered
+  - `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are configured in `n8n`
+- returns a JSON response to the caller
 
-- `OPENAI_API_KEY`
-- `TELEGRAM_BOT_TOKEN`
-- `TELEGRAM_CHAT_ID`
-- `DEALS_MONITOR_MODE`
+The advanced version additionally:
 
-Они уже предусмотрены в `/Users/merdan/notebook lm claude/nenado/.env.example:1`.
+- expects `X-Health-Agent-Secret` header
+- rejects unauthorized requests with `401`
+- appends each received payload to a CSV log path
 
-## Что делает текущая версия
+## Thresholds Included
 
-- запускается каждый день в `08:00 UTC`
-- запрашивает несколько стартовых источников
-- нормализует ответы
-- отправляет сырые данные в OpenAI Responses API
-- собирает Telegram-отчёт
-- шлёт его в Telegram через Bot API
+- `heart_rate > 85`
+- `glucose > 110`
+- `sleep_hours < 6`
 
-## Ограничения текущего JSON
+## Import Steps
 
-- `PREV_REPORT` пока пустой
-- Postgres delta engine пока не подключён внутрь workflow
-- список источников зашит в `Build Monitor Config`
+1. Open your `n8n` editor
+2. Create a new workflow
+3. Import either:
+   - `workflows/health-agent-webhook.workflow.json`
+   - or `workflows/health-agent-webhook-secure-csv.workflow.json`
+4. Save the workflow
+5. Copy the webhook URL from the `Apple Health Webhook` node
+6. Paste that URL into the iPhone app
+7. If you imported the advanced workflow, also enter the same shared secret in the app
+8. Tap `Save Settings`
 
-## Что лучше сделать следующим шагом
+## Environment Variables For The Advanced Version
 
-1. заменить список источников на чтение из `/data/services.json`
-2. добавить `Postgres` node для загрузки прошлого отчёта
-3. добавить `Postgres` node для `upsert` в таблицы `deals`, `deal_events`, `reports`
-4. добавить retry/error branch для нестабильных источников
+- `HEALTH_AGENT_WEBHOOK_SECRET`
+- `HEALTH_AGENT_CSV_PATH`
+- `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` if you want alerts
+
+Example request header:
+
+```text
+X-Health-Agent-Secret: your-shared-secret
+```
+
+## Recommended Follow-Up
+
+- add authentication or network restrictions in front of the webhook
+- add CSV or database logging after `Build Alerts`
+- tune thresholds to your own health workflow
