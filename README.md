@@ -27,11 +27,17 @@ Health Agent is designed for people who want their Apple Health data to stay on 
 | Path | Purpose |
 |---|---|
 | `ios/HealthAgentIOS` | SwiftUI iPhone app |
-| `workflows/` | n8n workflow exports |
-| `docs/` | setup and deployment docs |
-| `deploy/` | deployment scripts and infra files |
-| `sql/` | SQL support files |
+| `docs` | setup and payload documentation for Health Agent |
+| `workflows` | importable `n8n` workflow exports for Health Agent |
+| `deploy` | starter deployment templates for the Health Agent webhook flow |
+| `legacy/ai-deals-monitor` | archived AI Deals Monitor stack, workflows, SQL, deploy scripts, and docs |
 | `health-stack-guide.html` | interactive setup guide |
+
+## Repository Status
+
+The iOS app in `ios/HealthAgentIOS` is the current Health Agent implementation.
+
+The older `AI Deals Monitor` project has been moved under `legacy/ai-deals-monitor/` so the repository root stays focused on Health Agent. Legacy assets are preserved for reference only and are not the source of truth for the Health Agent app.
 
 ## Current Stack
 
@@ -40,7 +46,7 @@ Health Agent is designed for people who want their Apple Health data to stay on 
 | n8n | `localhost:5678` | running |
 | Ollama | `localhost:11434` | running |
 | Open WebUI | `localhost:3000` | running |
-| Webhook | `http://192.168.1.105:5678/webhook/apple-health` | active |
+| Webhook | configurable in the app | user-specified |
 
 ## iPhone App
 
@@ -74,6 +80,8 @@ Example payload:
 ```bash
 docker start n8n open-webui && ollama serve &
 ```
+
+Configure your own webhook endpoint in the app before tapping `Send Now`. The app no longer ships with a prefilled network target.
 
 ### Open the iPhone app in Xcode
 

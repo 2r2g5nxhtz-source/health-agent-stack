@@ -6,7 +6,8 @@
 
 - читает последние `heart_rate`, `glucose`, `weight`
 - суммирует `sleep_hours` за последние 24 часа
-- отправляет JSON на `http://192.168.1.105:5678/webhook/apple-health`
+- отправляет JSON на настраиваемый webhook `n8n`
+- может отправлять заголовок `X-Health-Agent-Secret` для защищённого webhook
 
 ## Payload
 
@@ -67,3 +68,5 @@ EXPORT_OPTIONS_PLIST="$PWD/export/ExportOptions.app-store.plist" ./scripts/expor
 - iPhone и Mac в одной сети с `n8n`
 - у приложения есть доступ к Health
 - webhook `n8n` активен
+- в приложении введён ваш собственный webhook URL
+- если используется secure workflow, в приложении указан тот же shared secret

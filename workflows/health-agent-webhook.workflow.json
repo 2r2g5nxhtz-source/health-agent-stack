@@ -1,0 +1,228 @@
+{
+  "name": "Health Agent Webhook",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "apple-health",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "5f3d92b1-70c1-4aa2-bd84-1f989f730001",
+      "name": "Apple Health Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -760,
+        240
+      ],
+      "webhookId": "apple-health"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body ?? $json;\n\nconst toNullableNumber = (value) => {\n  if (value === null || value === undefined || value === '') return null;\n  const num = Number(value);\n  return Number.isFinite(num) ? num : null;\n};\n\nconst glucoseRaw = toNullableNumber(body.glucose);\nconst glucoseMmol = glucoseRaw === null ? null : Number((glucoseRaw / 18).toFixed(1));\n\nconst payload = {\n  heart_rate: toNullableNumber(body.heart_rate),\n  glucose_raw: glucoseRaw,\n  glucose_mmol: glucoseMmol,\n  weight: toNullableNumber(body.weight),\n  sleep_hours: toNullableNumber(body.sleep_hours),\n  timestamp: typeof body.timestamp === 'string' && body.timestamp.trim()\n    ? body.timestamp.trim()\n    : new Date().toISOString(),\n};\n\nreturn [{\n  json: {\n    payload,\n    received_at: new Date().toISOString(),\n    source_ip: $json.headers?.['x-forwarded-for'] || $json.headers?.['x-real-ip'] || '',\n  },\n}];"
+      },
+      "id": "5f3d92b1-70c1-4aa2-bd84-1f989f730002",
+      "name": "Normalize Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -520,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $json.payload || {};\nconst alerts = [];\n\nif (payload.heart_rate !== null && payload.heart_rate > 85) {\n  alerts.push(`High heart rate: ${payload.heart_rate} bpm`);\n}\n\nif (payload.glucose_mmol !== null && payload.glucose_mmol > 6.0) {\n  alerts.push(`High glucose: ${payload.glucose_mmol} mmol/L`);\n}\n\nif (payload.sleep_hours !== null && payload.sleep_hours < 6) {\n  alerts.push(`Low sleep: ${payload.sleep_hours} hours in the last 24h`);\n}\n\nconst lines = [\n  'HEALTH AGENT ALERT',\n  `Timestamp: ${payload.timestamp}`,\n  '',\n  `heart_rate: ${payload.heart_rate ?? 'null'}`,\n  `glucose_mmol: ${payload.glucose_mmol ?? 'null'}`,\n  `weight: ${payload.weight ?? 'null'}`,\n  `sleep_hours: ${payload.sleep_hours ?? 'null'}`,\n  '',\n  alerts.length ? 'Alerts:' : 'No alerts triggered.',\n];\n\nfor (const alert of alerts) lines.push(`- ${alert}`);\n\nconst hasTelegram = !!($env.TELEGRAM_BOT_TOKEN && $env.TELEGRAM_CHAT_ID);\nconst sendTelegram = alerts.length > 0 && hasTelegram ? 1 : 0;\n\nreturn [{\n  json: {\n    payload,\n    received_at: $json.received_at,\n    source_ip: $json.source_ip,\n    alerts,\n    alert_count: alerts.length,\n    telegram_enabled: hasTelegram,\n    send_telegram: sendTelegram,\n    telegram_text: lines.join('\\n'),\n  },\n}];"
+      },
+      "id": "5f3d92b1-70c1-4aa2-bd84-1f989f730003",
+      "name": "Build Alerts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -280,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.send_telegram || 0 }}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "5f3d92b1-70c1-4aa2-bd84-1f989f730004",
+      "name": "Send Telegram?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -40,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{$env.TELEGRAM_BOT_TOKEN}}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{$env.TELEGRAM_CHAT_ID}}\",\n  \"text\": $json.telegram_text\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "5f3d92b1-70c1-4aa2-bd84-1f989f730005",
+      "name": "Send Telegram Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        200,
+        160
+      ],
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    ok: true,\n    telegram_sent: true,\n    alerts: $json.alerts,\n    alert_count: $json.alert_count,\n    payload: $json.payload,\n    received_at: $json.received_at,\n  },\n}];"
+      },
+      "id": "5f3d92b1-70c1-4aa2-bd84-1f989f730006",
+      "name": "Build Success Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    ok: true,\n    telegram_sent: false,\n    alerts: $json.alerts,\n    alert_count: $json.alert_count,\n    payload: $json.payload,\n    received_at: $json.received_at,\n  },\n}];"
+      },
+      "id": "5f3d92b1-70c1-4aa2-bd84-1f989f730007",
+      "name": "Build Direct Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        200,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "5f3d92b1-70c1-4aa2-bd84-1f989f730008",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        680,
+        240
+      ]
+    }
+  ],
+  "connections": {
+    "Apple Health Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Payload": {
+      "main": [
+        [
+          {
+            "node": "Build Alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Alerts": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Telegram?": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Direct Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Telegram Alert": {
+      "main": [
+        [
+          {
+            "node": "Build Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Success Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Direct Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "active": false,
+  "versionId": "5f3d92b1-70c1-4aa2-bd84-1f989f73abcd",
+  "tags": []
+}
