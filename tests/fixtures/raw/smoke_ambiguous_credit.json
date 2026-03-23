@@ -1,0 +1,27 @@
+{
+  "source_type": "community",
+  "source_url": "https://reddit.com/r/ChatGPT",
+  "service_slug": "chatgpt",
+  "title": "Users discuss possible credits",
+  "raw_text": "Some users think there might be a $10 credit, but nothing is confirmed.",
+  "detector_payload": {
+    "service": "chatgpt",
+    "event_type": "credits",
+    "event_class": "credit",
+    "title": "Possible $10 credits for ChatGPT",
+    "description": "Community discussion suggests a possible credit.",
+    "old_value": null,
+    "new_value": 10,
+    "currency": "USD",
+    "plan": null,
+    "region": "global",
+    "model": null,
+    "start_date": "2026-03-24",
+    "end_date": null,
+    "source_url": "https://reddit.com/r/ChatGPT",
+    "confidence": 0.45,
+    "evidence": [
+      "Some users think there might be a $10 credit, but nothing is confirmed."
+    ]
+  }
+}

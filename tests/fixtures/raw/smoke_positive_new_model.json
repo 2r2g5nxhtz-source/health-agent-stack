@@ -1,0 +1,27 @@
+{
+  "source_type": "official",
+  "source_url": "https://openai.com/news/",
+  "service_slug": "openai",
+  "title": "OpenAI announces GPT-4.1",
+  "raw_text": "OpenAI introduced GPT-4.1 for developers today.",
+  "detector_payload": {
+    "service": "openai",
+    "event_type": "new_model",
+    "event_class": "signal",
+    "title": "OpenAI introduced GPT-4.1",
+    "description": "OpenAI announced GPT-4.1 as a new model.",
+    "old_value": null,
+    "new_value": null,
+    "currency": null,
+    "plan": null,
+    "region": "global",
+    "model": "GPT 4.1",
+    "start_date": "2026-03-24",
+    "end_date": null,
+    "source_url": "https://openai.com/news/",
+    "confidence": 0.88,
+    "evidence": [
+      "OpenAI introduced GPT-4.1 for developers today."
+    ]
+  }
+}

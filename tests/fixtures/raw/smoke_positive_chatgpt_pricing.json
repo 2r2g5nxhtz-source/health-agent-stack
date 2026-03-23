@@ -1,0 +1,27 @@
+{
+  "source_type": "pricing",
+  "source_url": "https://chatgpt.com/pricing",
+  "service_slug": "chatgpt",
+  "title": "ChatGPT pricing update",
+  "raw_text": "ChatGPT Plus is now $25 per month instead of $20 per month.",
+  "detector_payload": {
+    "service": "chatgpt",
+    "event_type": "price_up",
+    "event_class": "fact",
+    "title": "ChatGPT Plus price increased to $25",
+    "description": "ChatGPT Plus changed from $20 to $25 per month.",
+    "old_value": 20,
+    "new_value": 25,
+    "currency": "USD",
+    "plan": "plus",
+    "region": "global",
+    "model": null,
+    "start_date": "2026-03-24",
+    "end_date": null,
+    "source_url": "https://chatgpt.com/pricing",
+    "confidence": 0.9,
+    "evidence": [
+      "ChatGPT Plus is now $25 per month instead of $20 per month."
+    ]
+  }
+}

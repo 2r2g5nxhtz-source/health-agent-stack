@@ -1,0 +1,27 @@
+{
+  "source_type": "official",
+  "source_url": "https://example.com/general-tech-news",
+  "service_slug": "chatgpt",
+  "title": "Generic tech commentary",
+  "raw_text": "People continue to talk about AI in general without any pricing, launch, plan, or model event.",
+  "detector_payload": {
+    "service": "chatgpt",
+    "event_type": "launch",
+    "event_class": "info",
+    "title": "Generic AI discussion",
+    "description": "General discussion without a concrete market event.",
+    "old_value": null,
+    "new_value": null,
+    "currency": null,
+    "plan": null,
+    "region": "global",
+    "model": null,
+    "start_date": "2019-01-01",
+    "end_date": null,
+    "source_url": "https://example.com/general-tech-news",
+    "confidence": 0.7,
+    "evidence": [
+      "People continue to talk about AI in general without any pricing, launch, plan, or model event."
+    ]
+  }
+}
