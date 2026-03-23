@@ -83,6 +83,45 @@ docker start n8n open-webui && ollama serve &
 
 Configure your own webhook endpoint in the app before tapping `Send Now`. The app no longer ships with a prefilled network target.
 
+### Run the Gemini Railway API
+
+This repository now also includes a minimal Gemini-backed HTTP API for Railway deployment.
+
+Required environment variables:
+
+- `GEMINI_API_KEY`
+
+Optional environment variables:
+
+- `GEMINI_MODEL` defaults to `gemini-1.5-flash`
+- `GEMINI_API_BASE` defaults to `https://generativelanguage.googleapis.com/v1beta`
+
+Local run:
+
+```bash
+python main.py
+```
+
+Endpoints:
+
+- `GET /health`
+- `GET /v1/models`
+- `POST /v1/generate`
+- `POST /v1/chat/completions`
+
+Example:
+
+```bash
+curl -X POST http://127.0.0.1:8080/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gemini-1.5-flash",
+    "messages": [
+      {"role": "user", "content": "Say hello in Russian"}
+    ]
+  }'
+```
+
 ### Open the iPhone app in Xcode
 
 ```bash
@@ -155,6 +194,7 @@ Contributions, issues, and improvements are welcome.
 - This project is local-first by design.
 - Apple Health data stays on your Apple devices and your own infrastructure unless you choose otherwise.
 - Telegram and CSV processing happen downstream in your own automation stack.
+- Railway deployment for the Gemini API uses `main.py`, `Procfile`, and `railway.toml` in the repository root.
 
 ### n8n 2.x
 
