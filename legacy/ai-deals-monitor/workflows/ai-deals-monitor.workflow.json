@@ -1,0 +1,263 @@
+{
+  "name": "AI Deals Monitor MVP",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "id": "5af6a6fb-4ea8-4ec9-8c08-1e56f84953fd",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -1120,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const services = [\n  'ChatGPT',\n  'Claude',\n  'Gemini',\n  'Cursor',\n  'Midjourney',\n  'ElevenLabs',\n  'Perplexity',\n  'Runway',\n  'HeyGen',\n  'Mistral',\n  'Replit',\n  'n8n',\n];\n\nconst sources = [\n  { service: 'ChatGPT', source: 'official_pricing', url: 'https://chatgpt.com/pricing' },\n  { service: 'Claude', source: 'official_pricing', url: 'https://www.anthropic.com/pricing' },\n  { service: 'AppSumo', source: 'deal_marketplace', url: 'https://appsumo.com/search/?q=AI' },\n  { service: 'StackSocial', source: 'deal_marketplace', url: 'https://www.stacksocial.com/search?query=ai' },\n  { service: 'Reddit ChatGPT', source: 'community_json', url: 'https://www.reddit.com/r/ChatGPT.json' },\n  { service: 'Product Hunt', source: 'rss', url: 'https://www.producthunt.com/feed' },\n];\n\nreturn sources.map((item) => ({\n  json: {\n    ...item,\n    services,\n    current_date: new Date().toISOString(),\n    prev_report: '',\n    mode: $env.DEALS_MONITOR_MODE || 'MODE_A',\n  },\n}));"
+      },
+      "id": "52fcb6c6-9f60-44d7-a885-c035456d21b9",
+      "name": "Build Monitor Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -880,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "AI Deals Monitor MVP"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json,text/html,application/rss+xml,application/xml;q=0.9,*/*;q=0.8"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "id": "c16e3e2c-b26d-4e16-b284-71684c6d3d66",
+      "name": "Fetch Source",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -640,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body;\nconst textBody = typeof body === 'string'\n  ? body\n  : JSON.stringify(body ?? {}, null, 2);\n\nconst normalizedText = textBody\n  .replace(/<script[\\s\\S]*?<\\/script>/gi, ' ')\n  .replace(/<style[\\s\\S]*?<\\/style>/gi, ' ')\n  .replace(/<[^>]+>/g, ' ')\n  .replace(/\\s+/g, ' ')\n  .trim()\n  .slice(0, 12000);\n\nreturn [{\n  json: {\n    service: $json.service,\n    source: $json.source,\n    source_url: $json.url,\n    status_code: $json.statusCode,\n    fetched_at: new Date().toISOString(),\n    services: $json.services,\n    current_date: $json.current_date,\n    prev_report: $json.prev_report,\n    mode: $json.mode,\n    raw_item: {\n      title: `${$json.service} / ${$json.source}`,\n      raw_text: normalizedText,\n    },\n  },\n}];"
+      },
+      "id": "aa65381f-18e0-4145-a78f-c462a621e949",
+      "name": "Normalize Source",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -400,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const items = $input.all().map((entry) => entry.json);\nconst first = items[0] ?? {};\n\nreturn [{\n  json: {\n    current_date: first.current_date || new Date().toISOString(),\n    prev_report: first.prev_report || '',\n    mode: first.mode || 'MODE_A',\n    services_json: JSON.stringify(first.services || []),\n    raw_items_json: JSON.stringify(items.map((item) => ({\n      service: item.service,\n      source: item.source,\n      source_url: item.source_url,\n      fetched_at: item.fetched_at,\n      status_code: item.status_code,\n      raw_item: item.raw_item,\n    }))),\n  },\n}];"
+      },
+      "id": "8d4d797a-955c-4730-b9f8-7d82467efa33",
+      "name": "Aggregate For AI",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -160,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/responses",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{$env.OPENAI_API_KEY}}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"gpt-4.1-mini\",\n  \"input\": [\n    {\n      \"role\": \"system\",\n      \"content\": [\n        {\n          \"type\": \"input_text\",\n          \"text\": \"You are AI Deals Monitor. Detect valid AI tool deals, discounts, promo codes, lifetime deals, and pricing changes. Ignore stale, duplicate, vague, or unverifiable offers. Score each deal 0-100 by discount quality, source credibility, freshness, and user value. Compare against PREV_REPORT and classify items as NEW, CHANGED, UNCHANGED, or EXPIRED. Return strict JSON with fields summary, top_deals, expired, notes.\"\n        }\n      ]\n    },\n    {\n      \"role\": \"user\",\n      \"content\": [\n        {\n          \"type\": \"input_text\",\n          \"text\": \"CURRENT_DATE: {{$json.current_date}}\\nMODE: {{$json.mode}}\\nPREV_REPORT: {{$json.prev_report}}\\nSERVICES_JSON: {{$json.services_json}}\\nRAW_ITEMS_JSON: {{$json.raw_items_json}}\"\n        }\n      ]\n    }\n  ],\n  \"text\": {\n    \"format\": {\n      \"type\": \"json_schema\",\n      \"name\": \"ai_deals_report\",\n      \"schema\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"summary\": {\n            \"type\": \"object\",\n            \"properties\": {\n              \"date\": { \"type\": \"string\" },\n              \"top_deals_count\": { \"type\": \"integer\" },\n              \"new_count\": { \"type\": \"integer\" },\n              \"changed_count\": { \"type\": \"integer\" },\n              \"expired_count\": { \"type\": \"integer\" }\n            },\n            \"required\": [\"date\", \"top_deals_count\", \"new_count\", \"changed_count\", \"expired_count\"],\n            \"additionalProperties\": false\n          },\n          \"top_deals\": {\n            \"type\": \"array\",\n            \"items\": {\n              \"type\": \"object\",\n              \"properties\": {\n                \"rank\": { \"type\": \"integer\" },\n                \"service\": { \"type\": \"string\" },\n                \"title\": { \"type\": \"string\" },\n                \"deal_type\": { \"type\": \"string\" },\n                \"price_before\": { \"type\": \"string\" },\n                \"price_now\": { \"type\": \"string\" },\n                \"discount_text\": { \"type\": \"string\" },\n                \"score\": { \"type\": \"integer\" },\n                \"status\": { \"type\": \"string\" },\n                \"why_it_matters\": { \"type\": \"string\" },\n                \"source_url\": { \"type\": \"string\" }\n              },\n              \"required\": [\"rank\", \"service\", \"title\", \"deal_type\", \"price_before\", \"price_now\", \"discount_text\", \"score\", \"status\", \"why_it_matters\", \"source_url\"],\n              \"additionalProperties\": false\n            }\n          },\n          \"expired\": {\n            \"type\": \"array\",\n            \"items\": { \"type\": \"string\" }\n          },\n          \"notes\": {\n            \"type\": \"array\",\n            \"items\": { \"type\": \"string\" }\n          }\n        },\n        \"required\": [\"summary\", \"top_deals\", \"expired\", \"notes\"],\n        \"additionalProperties\": false\n      }\n    }\n  }\n}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 60000
+        }
+      },
+      "id": "e5f88f2b-5c45-4f72-a465-3501202260de",
+      "name": "OpenAI Analyze",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        100,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const responseBody = $json.body ?? {};\nlet content = responseBody.output_text;\n\nif (!content && Array.isArray(responseBody.output)) {\n  const textChunks = [];\n  for (const item of responseBody.output) {\n    if (!Array.isArray(item.content)) continue;\n    for (const part of item.content) {\n      if (part.type === 'output_text' && part.text) textChunks.push(part.text);\n    }\n  }\n  content = textChunks.join('\\n');\n}\n\nlet report;\ntry {\n  report = typeof content === 'string' ? JSON.parse(content) : content;\n} catch (error) {\n  report = {\n    summary: {\n      date: new Date().toISOString().slice(0, 10),\n      top_deals_count: 0,\n      new_count: 0,\n      changed_count: 0,\n      expired_count: 0,\n    },\n    top_deals: [],\n    expired: [],\n    notes: ['OpenAI response was not valid JSON', String(error.message || error)],\n  };\n}\n\nconst topDeals = Array.isArray(report.top_deals) ? report.top_deals : [];\nconst lines = [\n  'AI TOOLS DEAL MONITOR',\n  `Date: ${report.summary?.date || new Date().toISOString().slice(0, 10)}`,\n  '',\n  'Top deals today:',\n];\n\nif (topDeals.length === 0) {\n  lines.push('No high-confidence deals found.');\n} else {\n  for (const deal of topDeals.slice(0, 5)) {\n    lines.push(`${deal.rank}. ${deal.service} — ${deal.title} (${deal.discount_text})`);\n  }\n}\n\nlines.push('');\nlines.push(`New deals: ${report.summary?.new_count ?? 0}`);\nlines.push(`Changed: ${report.summary?.changed_count ?? 0}`);\nlines.push(`Expired: ${report.summary?.expired_count ?? 0}`);\n\nreturn [{\n  json: {\n    report,\n    telegram_text: lines.join('\\n'),\n  },\n}];"
+      },
+      "id": "b420d488-a3c0-4ef7-aa0a-217d53855b10",
+      "name": "Build Telegram Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        360,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{$env.TELEGRAM_BOT_TOKEN}}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"chat_id\": \"{{$env.TELEGRAM_CHAT_ID}}\",\n  \"text\": $json.telegram_text\n}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "9f2e89c4-fb10-4b90-b9dd-58ad1ce775b5",
+      "name": "Send Telegram Report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        620,
+        240
+      ]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Build Monitor Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Monitor Config": {
+      "main": [
+        [
+          {
+            "node": "Fetch Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Source": {
+      "main": [
+        [
+          {
+            "node": "Normalize Source",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Source": {
+      "main": [
+        [
+          {
+            "node": "Aggregate For AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate For AI": {
+      "main": [
+        [
+          {
+            "node": "OpenAI Analyze",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Analyze": {
+      "main": [
+        [
+          {
+            "node": "Build Telegram Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Telegram Message": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "active": false,
+  "versionId": "d74f98cb-2461-4629-95f4-ffed1aef1a5e",
+  "tags": []
+}
