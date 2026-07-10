@@ -100,7 +100,8 @@ final class HealthAgentViewModel: ObservableObject {
                 detail: statusMessage
             )
         } catch {
-            statusMessage = error.localizedDescription
+            let ns = error as NSError
+            statusMessage = "\(error.localizedDescription) [domain=\(ns.domain) code=\(ns.code)]"
             addHistoryEntry(status: .failed, payload: lastPayload, warnings: lastWarnings, detail: statusMessage)
         }
 
@@ -161,7 +162,8 @@ final class HealthAgentViewModel: ObservableObject {
             statusMessage = "Sent simulator payload successfully at \(result.payload.timestamp)"
             addHistoryEntry(status: .success, payload: result.payload, warnings: result.warnings, detail: statusMessage)
         } catch {
-            statusMessage = error.localizedDescription
+            let ns = error as NSError
+            statusMessage = "\(error.localizedDescription) [domain=\(ns.domain) code=\(ns.code)]"
             addHistoryEntry(status: .failed, payload: lastPayload, warnings: lastWarnings, detail: statusMessage)
         }
 
@@ -317,7 +319,8 @@ final class HealthAgentViewModel: ObservableObject {
         }
         request.httpBody = try JSONEncoder().encode(payload)
 
-        let (_, response) = try await URLSession.shared.data(for: request)
+        let session = URLSession(configuration: .default, delegate: TailnetTrustDelegate(trustedHost: webhookURL.host), delegateQueue: nil)
+        let (_, response) = try await session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
             throw HealthAgentError.invalidResponse
@@ -352,6 +355,49 @@ final class HealthAgentViewModel: ObservableObject {
         }
 
         return entries
+    }
+}
+
+/// Trusts a self-signed TLS certificate ONLY for the specific host the user configured
+/// as their webhook (their own Tailscale-only n8n gateway). All other hosts fall back
+/// to standard system trust evaluation — this does not weaken TLS validation globally.
+final class TailnetTrustDelegate: NSObject, URLSessionDelegate, URLSessionTaskDelegate {
+    private let trustedHost: String?
+
+    init(trustedHost: String?) {
+        self.trustedHost = trustedHost
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        didReceive challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        evaluate(challenge, completionHandler: completionHandler)
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didReceive challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        evaluate(challenge, completionHandler: completionHandler)
+    }
+
+    private func evaluate(
+        _ challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        guard
+            challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+            let serverTrust = challenge.protectionSpace.serverTrust,
+            challenge.protectionSpace.host == trustedHost
+        else {
+            completionHandler(.performDefaultHandling, nil)
+            return
+        }
+        completionHandler(.useCredential, URLCredential(trust: serverTrust))
     }
 }
 
