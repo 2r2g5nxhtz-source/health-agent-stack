@@ -7,6 +7,11 @@ struct HealthAgentIOSApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView(viewModel: viewModel)
+                .task {
+                    // Register HealthKit background delivery so new samples are
+                    // posted automatically without a manual "Send Now" tap.
+                    viewModel.startBackgroundDelivery()
+                }
         }
     }
 }

@@ -106,6 +106,76 @@ final class HealthAgentViewModel: ObservableObject {
         }
 
         isLoading = false
+        // Now that permissions have been granted at least once, (re)register
+        // background delivery so future samples post automatically.
+        startBackgroundDelivery()
+        #endif
+    }
+
+    /// Types HealthKit should wake the app for in the background.
+    private var backgroundDeliveryTypes: [HKSampleType] {
+        [
+            HKQuantityType.quantityType(forIdentifier: .heartRate),
+            HKQuantityType.quantityType(forIdentifier: .bloodGlucose),
+            HKQuantityType.quantityType(forIdentifier: .bodyMass),
+            HKCategoryType.categoryType(forIdentifier: .sleepAnalysis)
+        ].compactMap { $0 }
+    }
+
+    private var observerQueries: [HKObserverQuery] = []
+
+    /// Registers HealthKit background delivery + observer queries so the app is
+    /// woken when NEW health samples arrive and posts them automatically. iOS
+    /// still decides the exact timing, but no manual "Send Now" tap is needed.
+    /// Call once at app launch (after permissions have been granted at least once).
+    func startBackgroundDelivery() {
+        #if !targetEnvironment(simulator)
+        guard HKHealthStore.isHealthDataAvailable() else { return }
+        guard observerQueries.isEmpty else { return } // already registered
+
+        for type in backgroundDeliveryTypes {
+            healthStore.enableBackgroundDelivery(for: type, frequency: .hourly) { _, _ in }
+
+            let query = HKObserverQuery(sampleType: type, predicate: nil) { [weak self] _, completion, _ in
+                let done = UncheckedSendableBox(completion)
+                Task { @MainActor in
+                    await self?.sendInBackground()
+                    done.value()
+                }
+            }
+            healthStore.execute(query)
+            observerQueries.append(query)
+        }
+        #endif
+    }
+
+    /// Silent send used by background observers — same payload/send path as the
+    /// manual button, but without touching UI-facing loading state.
+    private func sendInBackground() async {
+        #if !targetEnvironment(simulator)
+        let trimmedWebhookURL = webhookURLString.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard
+            !trimmedWebhookURL.isEmpty,
+            trimmedWebhookURL != webhookPlaceholder,
+            let webhookURL = URL(string: trimmedWebhookURL),
+            let scheme = webhookURL.scheme, ["http", "https"].contains(scheme)
+        else { return }
+
+        do {
+            let result = await buildPayload()
+            try await send(payload: result.payload, to: webhookURL)
+            lastPayload = result.payload
+            statusMessage = "Auto-sent at \(result.payload.timestamp)"
+            addHistoryEntry(
+                status: result.warnings.isEmpty ? .success : .warning,
+                payload: result.payload,
+                warnings: result.warnings,
+                detail: statusMessage
+            )
+        } catch {
+            let ns = error as NSError
+            addHistoryEntry(status: .failed, payload: lastPayload, warnings: [], detail: "Auto-send failed: \(error.localizedDescription) [code=\(ns.code)]")
+        }
         #endif
     }
 
@@ -399,6 +469,13 @@ final class TailnetTrustDelegate: NSObject, URLSessionDelegate, URLSessionTaskDe
         }
         completionHandler(.useCredential, URLCredential(trust: serverTrust))
     }
+}
+
+/// Wraps a non-Sendable value so it can cross an actor boundary once.
+/// Used to carry HealthKit's completion handler into the @MainActor task.
+private final class UncheckedSendableBox<T>: @unchecked Sendable {
+    let value: T
+    init(_ value: T) { self.value = value }
 }
 
 struct HealthPayload: Codable, Sendable {

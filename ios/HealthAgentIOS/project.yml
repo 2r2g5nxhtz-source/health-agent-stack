@@ -32,11 +32,14 @@ targets:
       properties:
         com.apple.developer.healthkit: true
         com.apple.developer.healthkit.access: []
+        com.apple.developer.healthkit.background-delivery: true
     info:
       path: Resources/Info.plist
       properties:
         NSHealthShareUsageDescription: "Health Agent reads your recent heart rate, weight, glucose, and sleep data to send a summary to your private n8n webhook."
         NSHealthUpdateUsageDescription: "Health Agent does not write any data back to Health."
+        UIBackgroundModes:
+          - processing
         NSAppTransportSecurity:
           NSExceptionDomains:
             "100.118.71.4":
