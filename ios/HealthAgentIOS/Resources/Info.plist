@@ -35,5 +35,9 @@
 	<string>Health Agent reads your recent heart rate, weight, glucose, and sleep data to send a summary to your private n8n webhook.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>Health Agent does not write any data back to Health.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>processing</string>
+	</array>
 </dict>
 </plist>
