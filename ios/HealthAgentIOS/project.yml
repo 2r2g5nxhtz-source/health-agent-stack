@@ -29,9 +29,18 @@ targets:
         ENABLE_PREVIEWS: YES
     entitlements:
       path: Resources/HealthAgentIOS.entitlements
+      properties:
+        com.apple.developer.healthkit: true
+        com.apple.developer.healthkit.access: []
     info:
       path: Resources/Info.plist
-    capabilities:
-      healthkit: true
+      properties:
+        NSHealthShareUsageDescription: "Health Agent reads your recent heart rate, weight, glucose, and sleep data to send a summary to your private n8n webhook."
+        NSHealthUpdateUsageDescription: "Health Agent does not write any data back to Health."
+        NSAppTransportSecurity:
+          NSExceptionDomains:
+            "100.118.71.4":
+              NSExceptionAllowsInsecureHTTPLoads: true
+              NSIncludesSubdomains: false
     scheme:
       testTargets: []
