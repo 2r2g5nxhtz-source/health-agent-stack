@@ -26,6 +26,20 @@ struct ContentView: View {
                                     metricCard(title: "Sleep", value: formattedValue(payload.sleepHours), tint: .teal)
                                 }
 
+                                HStack(spacing: 12) {
+                                    metricCard(title: "HRV", value: formattedValue(payload.hrv), tint: .purple)
+                                    metricCard(title: "Resting HR", value: formattedValue(payload.restingHeartRate), tint: .pink)
+                                }
+
+                                HStack(spacing: 12) {
+                                    metricCard(title: "SpO2", value: formattedValue(payload.spo2), tint: .cyan)
+                                    metricCard(title: "Resp. Rate", value: formattedValue(payload.respiratoryRate), tint: .indigo)
+                                }
+
+                                HStack(spacing: 12) {
+                                    metricCard(title: "Steps", value: formattedValue(payload.steps), tint: .green)
+                                }
+
                                 if let latestSend = viewModel.sendHistory.first {
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text("Latest Send")
@@ -109,6 +123,11 @@ struct ContentView: View {
                                 payloadRow("glucose", value: payload.glucose)
                                 payloadRow("weight", value: payload.weight)
                                 payloadRow("sleep_hours", value: payload.sleepHours)
+                                payloadRow("hrv", value: payload.hrv)
+                                payloadRow("resting_heart_rate", value: payload.restingHeartRate)
+                                payloadRow("spo2", value: payload.spo2)
+                                payloadRow("respiratory_rate", value: payload.respiratoryRate)
+                                payloadRow("steps", value: payload.steps)
                                 Text("timestamp: \(payload.timestamp)")
                                     .font(.footnote)
                                     .foregroundStyle(.secondary)
@@ -145,6 +164,16 @@ struct ContentView: View {
                                             Text("weight: \(formattedValue(payload.weight))")
                                                 .font(.footnote)
                                             Text("sleep_hours: \(formattedValue(payload.sleepHours))")
+                                                .font(.footnote)
+                                            Text("hrv: \(formattedValue(payload.hrv))")
+                                                .font(.footnote)
+                                            Text("resting_heart_rate: \(formattedValue(payload.restingHeartRate))")
+                                                .font(.footnote)
+                                            Text("spo2: \(formattedValue(payload.spo2))")
+                                                .font(.footnote)
+                                            Text("respiratory_rate: \(formattedValue(payload.respiratoryRate))")
+                                                .font(.footnote)
+                                            Text("steps: \(formattedValue(payload.steps))")
                                                 .font(.footnote)
                                         }
 

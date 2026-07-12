@@ -118,7 +118,12 @@ final class HealthAgentViewModel: ObservableObject {
             HKQuantityType.quantityType(forIdentifier: .heartRate),
             HKQuantityType.quantityType(forIdentifier: .bloodGlucose),
             HKQuantityType.quantityType(forIdentifier: .bodyMass),
-            HKCategoryType.categoryType(forIdentifier: .sleepAnalysis)
+            HKCategoryType.categoryType(forIdentifier: .sleepAnalysis),
+            HKQuantityType.quantityType(forIdentifier: .heartRateVariabilitySDNN),
+            HKQuantityType.quantityType(forIdentifier: .restingHeartRate),
+            HKQuantityType.quantityType(forIdentifier: .oxygenSaturation),
+            HKQuantityType.quantityType(forIdentifier: .respiratoryRate),
+            HKQuantityType.quantityType(forIdentifier: .stepCount)
         ].compactMap { $0 }
     }
 
@@ -197,7 +202,12 @@ final class HealthAgentViewModel: ObservableObject {
             HKQuantityType.quantityType(forIdentifier: .heartRate)!,
             HKQuantityType.quantityType(forIdentifier: .bloodGlucose)!,
             HKQuantityType.quantityType(forIdentifier: .bodyMass)!,
-            HKCategoryType.categoryType(forIdentifier: .sleepAnalysis)!
+            HKCategoryType.categoryType(forIdentifier: .sleepAnalysis)!,
+            HKQuantityType.quantityType(forIdentifier: .heartRateVariabilitySDNN)!,
+            HKQuantityType.quantityType(forIdentifier: .restingHeartRate)!,
+            HKQuantityType.quantityType(forIdentifier: .oxygenSaturation)!,
+            HKQuantityType.quantityType(forIdentifier: .respiratoryRate)!,
+            HKQuantityType.quantityType(forIdentifier: .stepCount)!
         ]
 
         try await healthStore.requestAuthorization(toShare: [], read: types)
@@ -246,6 +256,11 @@ final class HealthAgentViewModel: ObservableObject {
             glucose: 118,
             weight: 81.4,
             sleepHours: 5.6,
+            hrv: 30,
+            restingHeartRate: 72,
+            spo2: 96,
+            respiratoryRate: 16,
+            steps: 7000,
             timestamp: ISO8601DateFormatter().string(from: Date())
         )
 
@@ -261,18 +276,43 @@ final class HealthAgentViewModel: ObservableObject {
         async let glucoseResult = latestBloodGlucose()
         async let weightResult = latestBodyMass()
         async let sleepHoursResult = totalSleepHoursForLast24Hours()
+        async let hrvResult = latestHRV()
+        async let restingHeartRateResult = latestRestingHeartRate()
+        async let spo2Result = latestSpO2()
+        async let respiratoryRateResult = latestRespiratoryRate()
+        async let stepsResult = totalStepsForLast24Hours()
 
         let heartRate = await heartRateResult
         let glucose = await glucoseResult
         let weight = await weightResult
         let sleepHours = await sleepHoursResult
+        let hrv = await hrvResult
+        let restingHeartRate = await restingHeartRateResult
+        let spo2 = await spo2Result
+        let respiratoryRate = await respiratoryRateResult
+        let steps = await stepsResult
 
-        let warnings = [heartRate.warning, glucose.warning, weight.warning, sleepHours.warning].compactMap { $0 }
+        let warnings = [
+            heartRate.warning,
+            glucose.warning,
+            weight.warning,
+            sleepHours.warning,
+            hrv.warning,
+            restingHeartRate.warning,
+            spo2.warning,
+            respiratoryRate.warning,
+            steps.warning
+        ].compactMap { $0 }
         let payload = HealthPayload(
             heartRate: heartRate.value,
             glucose: glucose.value,
             weight: weight.value,
             sleepHours: sleepHours.value,
+            hrv: hrv.value,
+            restingHeartRate: restingHeartRate.value,
+            spo2: spo2.value,
+            respiratoryRate: respiratoryRate.value,
+            steps: steps.value,
             timestamp: ISO8601DateFormatter().string(from: Date())
         )
 
@@ -310,6 +350,81 @@ final class HealthAgentViewModel: ObservableObject {
             return .init(value: value, warning: nil)
         } catch {
             return .init(value: nil, warning: "Body mass sample not available.")
+        }
+    }
+
+    private func latestHRV() async -> SampleResult<Double> {
+        let type = HKQuantityType.quantityType(forIdentifier: .heartRateVariabilitySDNN)!
+        do {
+            let sample = try await latestQuantitySample(for: type)
+            let value = sample.quantity.doubleValue(for: .secondUnit(with: .milli))
+            return .init(value: value, warning: nil)
+        } catch {
+            return .init(value: nil, warning: "Heart rate variability sample not available.")
+        }
+    }
+
+    private func latestRestingHeartRate() async -> SampleResult<Double> {
+        let type = HKQuantityType.quantityType(forIdentifier: .restingHeartRate)!
+        do {
+            let sample = try await latestQuantitySample(for: type)
+            let value = sample.quantity.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
+            return .init(value: value, warning: nil)
+        } catch {
+            return .init(value: nil, warning: "Resting heart rate sample not available.")
+        }
+    }
+
+    private func latestSpO2() async -> SampleResult<Double> {
+        let type = HKQuantityType.quantityType(forIdentifier: .oxygenSaturation)!
+        do {
+            let sample = try await latestQuantitySample(for: type)
+            let value = sample.quantity.doubleValue(for: .percent()) * 100
+            return .init(value: value, warning: nil)
+        } catch {
+            return .init(value: nil, warning: "Blood oxygen (SpO2) sample not available.")
+        }
+    }
+
+    private func latestRespiratoryRate() async -> SampleResult<Double> {
+        let type = HKQuantityType.quantityType(forIdentifier: .respiratoryRate)!
+        do {
+            let sample = try await latestQuantitySample(for: type)
+            let value = sample.quantity.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
+            return .init(value: value, warning: nil)
+        } catch {
+            return .init(value: nil, warning: "Respiratory rate sample not available.")
+        }
+    }
+
+    private func totalStepsForLast24Hours() async -> SampleResult<Double> {
+        let type = HKQuantityType.quantityType(forIdentifier: .stepCount)!
+        let endDate = Date()
+        let startDate = Calendar.current.date(byAdding: .day, value: -1, to: endDate)!
+        let predicate = HKQuery.predicateForSamples(withStart: startDate, end: endDate)
+
+        do {
+            let statistics = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<HKStatistics?, Error>) in
+                let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, statistics, error in
+                    if let error {
+                        continuation.resume(throwing: error)
+                        return
+                    }
+
+                    continuation.resume(returning: statistics)
+                }
+
+                healthStore.execute(query)
+            }
+
+            guard let sum = statistics?.sumQuantity() else {
+                return .init(value: nil, warning: "Step count sample not available.")
+            }
+
+            let value = sum.doubleValue(for: .count())
+            return .init(value: value, warning: nil)
+        } catch {
+            return .init(value: nil, warning: "Step count sample not available.")
         }
     }
 
@@ -483,13 +598,47 @@ struct HealthPayload: Codable, Sendable {
     let glucose: Double?
     let weight: Double?
     let sleepHours: Double?
+    let hrv: Double?
+    let restingHeartRate: Double?
+    let spo2: Double?
+    let respiratoryRate: Double?
+    let steps: Double?
     let timestamp: String
+
+    init(
+        heartRate: Double? = nil,
+        glucose: Double? = nil,
+        weight: Double? = nil,
+        sleepHours: Double? = nil,
+        hrv: Double? = nil,
+        restingHeartRate: Double? = nil,
+        spo2: Double? = nil,
+        respiratoryRate: Double? = nil,
+        steps: Double? = nil,
+        timestamp: String
+    ) {
+        self.heartRate = heartRate
+        self.glucose = glucose
+        self.weight = weight
+        self.sleepHours = sleepHours
+        self.hrv = hrv
+        self.restingHeartRate = restingHeartRate
+        self.spo2 = spo2
+        self.respiratoryRate = respiratoryRate
+        self.steps = steps
+        self.timestamp = timestamp
+    }
 
     enum CodingKeys: String, CodingKey {
         case heartRate = "heart_rate"
         case glucose
         case weight
         case sleepHours = "sleep_hours"
+        case hrv
+        case restingHeartRate = "resting_heart_rate"
+        case spo2
+        case respiratoryRate = "respiratory_rate"
+        case steps
         case timestamp
     }
 }
@@ -540,6 +689,11 @@ struct SendHistoryPayload: Codable, Sendable {
     let glucose: Double?
     let weight: Double?
     let sleepHours: Double?
+    let hrv: Double?
+    let restingHeartRate: Double?
+    let spo2: Double?
+    let respiratoryRate: Double?
+    let steps: Double?
     let timestamp: String
 
     init(payload: HealthPayload) {
@@ -547,6 +701,11 @@ struct SendHistoryPayload: Codable, Sendable {
         glucose = payload.glucose
         weight = payload.weight
         sleepHours = payload.sleepHours
+        hrv = payload.hrv
+        restingHeartRate = payload.restingHeartRate
+        spo2 = payload.spo2
+        respiratoryRate = payload.respiratoryRate
+        steps = payload.steps
         timestamp = payload.timestamp
     }
 }
