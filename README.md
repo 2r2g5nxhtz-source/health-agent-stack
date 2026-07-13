@@ -54,14 +54,13 @@ The iOS app lives in [`ios/HealthAgentIOS`](./ios/HealthAgentIOS).
 
 It currently:
 
-- reads latest `heart_rate`
-- reads latest `glucose`
-- reads latest `weight`
+- reads latest `heart_rate`, `glucose`, `weight`, `hrv`, `resting_heart_rate`, `spo2`, `respiratory_rate`, `steps`
 - totals `sleep_hours` for the last 24 hours
+- delivers health data automatically in the background (HealthKit background delivery)
 - posts data to a configurable `n8n` webhook
 - sends `null` instead of crashing when a sample is missing
 
-Example payload:
+Example payload (full schema in [`docs/PAYLOAD.md`](./docs/PAYLOAD.md)):
 
 ```json
 {
@@ -69,6 +68,11 @@ Example payload:
   "glucose": 100,
   "weight": 75.0,
   "sleep_hours": 8.0,
+  "hrv": 50,
+  "resting_heart_rate": 60,
+  "spo2": 98,
+  "respiratory_rate": 16.0,
+  "steps": 10000,
   "timestamp": "2026-03-15T08:00:00Z"
 }
 ```
@@ -161,10 +165,17 @@ The current webhook payload is designed to fit the downstream `n8n` flow:
 iPhone HealthKit app
 -> POST /webhook/apple-health
 -> n8n
--> code node / rules
--> Telegram alerts
--> CSV log
+   ├─> code node / rules -> Telegram alerts
+   └─> Build Receiver Payload -> Forward to Receiver
+       (optional: POST to a local receiver, e.g. host.docker.internal:5679,
+        which upserts observations into a local SQLite store)
 ```
+
+The `Forward to Receiver` branch uses an `httpHeaderAuth` credential
+(`Health Receiver Token`) so the receiver token never lands in the exported
+workflow JSON. After importing the workflow, create that credential in your
+n8n instance (or delete the branch if you do not run a local receiver).
+See [`docs/N8N_IMPORT.md`](./docs/N8N_IMPORT.md).
 
 Example alert thresholds already used in the stack:
 
@@ -175,7 +186,7 @@ Example alert thresholds already used in the stack:
 ## Roadmap
 
 - TestFlight-ready iOS distribution
-- background sync from iPhone
+- ~~background sync from iPhone~~ ✅ shipped (HealthKit background delivery)
 - Apple Watch-friendly flows
 - better charts and local trends
 - reusable workflow templates
