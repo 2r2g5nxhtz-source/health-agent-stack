@@ -18,7 +18,26 @@
 	<string>1.0</string>
 	<key>CFBundleVersion</key>
 	<string>1</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSExceptionDomains</key>
+		<dict>
+			<key>100.118.71.4</key>
+			<dict>
+				<key>NSExceptionAllowsInsecureHTTPLoads</key>
+				<true/>
+				<key>NSIncludesSubdomains</key>
+				<false/>
+			</dict>
+		</dict>
+	</dict>
 	<key>NSHealthShareUsageDescription</key>
-	<string>Health Agent reads your selected Apple Health samples so it can send them to your private webhook.</string>
+	<string>Health Agent reads your recent heart rate, weight, glucose, and sleep data to send a summary to your private n8n webhook.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>Health Agent does not write any data back to Health.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>processing</string>
+	</array>
 </dict>
 </plist>

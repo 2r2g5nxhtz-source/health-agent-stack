@@ -100,11 +100,87 @@ final class HealthAgentViewModel: ObservableObject {
                 detail: statusMessage
             )
         } catch {
-            statusMessage = error.localizedDescription
+            let ns = error as NSError
+            statusMessage = "\(error.localizedDescription) [domain=\(ns.domain) code=\(ns.code)]"
             addHistoryEntry(status: .failed, payload: lastPayload, warnings: lastWarnings, detail: statusMessage)
         }
 
         isLoading = false
+        // Now that permissions have been granted at least once, (re)register
+        // background delivery so future samples post automatically.
+        startBackgroundDelivery()
+        #endif
+    }
+
+    /// Types HealthKit should wake the app for in the background.
+    private var backgroundDeliveryTypes: [HKSampleType] {
+        [
+            HKQuantityType.quantityType(forIdentifier: .heartRate),
+            HKQuantityType.quantityType(forIdentifier: .bloodGlucose),
+            HKQuantityType.quantityType(forIdentifier: .bodyMass),
+            HKCategoryType.categoryType(forIdentifier: .sleepAnalysis),
+            HKQuantityType.quantityType(forIdentifier: .heartRateVariabilitySDNN),
+            HKQuantityType.quantityType(forIdentifier: .restingHeartRate),
+            HKQuantityType.quantityType(forIdentifier: .oxygenSaturation),
+            HKQuantityType.quantityType(forIdentifier: .respiratoryRate),
+            HKQuantityType.quantityType(forIdentifier: .stepCount)
+        ].compactMap { $0 }
+    }
+
+    private var observerQueries: [HKObserverQuery] = []
+
+    /// Registers HealthKit background delivery + observer queries so the app is
+    /// woken when NEW health samples arrive and posts them automatically. iOS
+    /// still decides the exact timing, but no manual "Send Now" tap is needed.
+    /// Call once at app launch (after permissions have been granted at least once).
+    func startBackgroundDelivery() {
+        #if !targetEnvironment(simulator)
+        guard HKHealthStore.isHealthDataAvailable() else { return }
+        guard observerQueries.isEmpty else { return } // already registered
+
+        for type in backgroundDeliveryTypes {
+            healthStore.enableBackgroundDelivery(for: type, frequency: .hourly) { _, _ in }
+
+            let query = HKObserverQuery(sampleType: type, predicate: nil) { [weak self] _, completion, _ in
+                let done = UncheckedSendableBox(completion)
+                Task { @MainActor in
+                    await self?.sendInBackground()
+                    done.value()
+                }
+            }
+            healthStore.execute(query)
+            observerQueries.append(query)
+        }
+        #endif
+    }
+
+    /// Silent send used by background observers — same payload/send path as the
+    /// manual button, but without touching UI-facing loading state.
+    private func sendInBackground() async {
+        #if !targetEnvironment(simulator)
+        let trimmedWebhookURL = webhookURLString.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard
+            !trimmedWebhookURL.isEmpty,
+            trimmedWebhookURL != webhookPlaceholder,
+            let webhookURL = URL(string: trimmedWebhookURL),
+            let scheme = webhookURL.scheme, ["http", "https"].contains(scheme)
+        else { return }
+
+        do {
+            let result = await buildPayload()
+            try await send(payload: result.payload, to: webhookURL)
+            lastPayload = result.payload
+            statusMessage = "Auto-sent at \(result.payload.timestamp)"
+            addHistoryEntry(
+                status: result.warnings.isEmpty ? .success : .warning,
+                payload: result.payload,
+                warnings: result.warnings,
+                detail: statusMessage
+            )
+        } catch {
+            let ns = error as NSError
+            addHistoryEntry(status: .failed, payload: lastPayload, warnings: [], detail: "Auto-send failed: \(error.localizedDescription) [code=\(ns.code)]")
+        }
         #endif
     }
 
@@ -126,7 +202,12 @@ final class HealthAgentViewModel: ObservableObject {
             HKQuantityType.quantityType(forIdentifier: .heartRate)!,
             HKQuantityType.quantityType(forIdentifier: .bloodGlucose)!,
             HKQuantityType.quantityType(forIdentifier: .bodyMass)!,
-            HKCategoryType.categoryType(forIdentifier: .sleepAnalysis)!
+            HKCategoryType.categoryType(forIdentifier: .sleepAnalysis)!,
+            HKQuantityType.quantityType(forIdentifier: .heartRateVariabilitySDNN)!,
+            HKQuantityType.quantityType(forIdentifier: .restingHeartRate)!,
+            HKQuantityType.quantityType(forIdentifier: .oxygenSaturation)!,
+            HKQuantityType.quantityType(forIdentifier: .respiratoryRate)!,
+            HKQuantityType.quantityType(forIdentifier: .stepCount)!
         ]
 
         try await healthStore.requestAuthorization(toShare: [], read: types)
@@ -161,7 +242,8 @@ final class HealthAgentViewModel: ObservableObject {
             statusMessage = "Sent simulator payload successfully at \(result.payload.timestamp)"
             addHistoryEntry(status: .success, payload: result.payload, warnings: result.warnings, detail: statusMessage)
         } catch {
-            statusMessage = error.localizedDescription
+            let ns = error as NSError
+            statusMessage = "\(error.localizedDescription) [domain=\(ns.domain) code=\(ns.code)]"
             addHistoryEntry(status: .failed, payload: lastPayload, warnings: lastWarnings, detail: statusMessage)
         }
 
@@ -174,6 +256,11 @@ final class HealthAgentViewModel: ObservableObject {
             glucose: 118,
             weight: 81.4,
             sleepHours: 5.6,
+            hrv: 30,
+            restingHeartRate: 72,
+            spo2: 96,
+            respiratoryRate: 16,
+            steps: 7000,
             timestamp: ISO8601DateFormatter().string(from: Date())
         )
 
@@ -189,18 +276,43 @@ final class HealthAgentViewModel: ObservableObject {
         async let glucoseResult = latestBloodGlucose()
         async let weightResult = latestBodyMass()
         async let sleepHoursResult = totalSleepHoursForLast24Hours()
+        async let hrvResult = latestHRV()
+        async let restingHeartRateResult = latestRestingHeartRate()
+        async let spo2Result = latestSpO2()
+        async let respiratoryRateResult = latestRespiratoryRate()
+        async let stepsResult = totalStepsForLast24Hours()
 
         let heartRate = await heartRateResult
         let glucose = await glucoseResult
         let weight = await weightResult
         let sleepHours = await sleepHoursResult
+        let hrv = await hrvResult
+        let restingHeartRate = await restingHeartRateResult
+        let spo2 = await spo2Result
+        let respiratoryRate = await respiratoryRateResult
+        let steps = await stepsResult
 
-        let warnings = [heartRate.warning, glucose.warning, weight.warning, sleepHours.warning].compactMap { $0 }
+        let warnings = [
+            heartRate.warning,
+            glucose.warning,
+            weight.warning,
+            sleepHours.warning,
+            hrv.warning,
+            restingHeartRate.warning,
+            spo2.warning,
+            respiratoryRate.warning,
+            steps.warning
+        ].compactMap { $0 }
         let payload = HealthPayload(
             heartRate: heartRate.value,
             glucose: glucose.value,
             weight: weight.value,
             sleepHours: sleepHours.value,
+            hrv: hrv.value,
+            restingHeartRate: restingHeartRate.value,
+            spo2: spo2.value,
+            respiratoryRate: respiratoryRate.value,
+            steps: steps.value,
             timestamp: ISO8601DateFormatter().string(from: Date())
         )
 
@@ -238,6 +350,81 @@ final class HealthAgentViewModel: ObservableObject {
             return .init(value: value, warning: nil)
         } catch {
             return .init(value: nil, warning: "Body mass sample not available.")
+        }
+    }
+
+    private func latestHRV() async -> SampleResult<Double> {
+        let type = HKQuantityType.quantityType(forIdentifier: .heartRateVariabilitySDNN)!
+        do {
+            let sample = try await latestQuantitySample(for: type)
+            let value = sample.quantity.doubleValue(for: .secondUnit(with: .milli))
+            return .init(value: value, warning: nil)
+        } catch {
+            return .init(value: nil, warning: "Heart rate variability sample not available.")
+        }
+    }
+
+    private func latestRestingHeartRate() async -> SampleResult<Double> {
+        let type = HKQuantityType.quantityType(forIdentifier: .restingHeartRate)!
+        do {
+            let sample = try await latestQuantitySample(for: type)
+            let value = sample.quantity.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
+            return .init(value: value, warning: nil)
+        } catch {
+            return .init(value: nil, warning: "Resting heart rate sample not available.")
+        }
+    }
+
+    private func latestSpO2() async -> SampleResult<Double> {
+        let type = HKQuantityType.quantityType(forIdentifier: .oxygenSaturation)!
+        do {
+            let sample = try await latestQuantitySample(for: type)
+            let value = sample.quantity.doubleValue(for: .percent()) * 100
+            return .init(value: value, warning: nil)
+        } catch {
+            return .init(value: nil, warning: "Blood oxygen (SpO2) sample not available.")
+        }
+    }
+
+    private func latestRespiratoryRate() async -> SampleResult<Double> {
+        let type = HKQuantityType.quantityType(forIdentifier: .respiratoryRate)!
+        do {
+            let sample = try await latestQuantitySample(for: type)
+            let value = sample.quantity.doubleValue(for: HKUnit.count().unitDivided(by: .minute()))
+            return .init(value: value, warning: nil)
+        } catch {
+            return .init(value: nil, warning: "Respiratory rate sample not available.")
+        }
+    }
+
+    private func totalStepsForLast24Hours() async -> SampleResult<Double> {
+        let type = HKQuantityType.quantityType(forIdentifier: .stepCount)!
+        let endDate = Date()
+        let startDate = Calendar.current.date(byAdding: .day, value: -1, to: endDate)!
+        let predicate = HKQuery.predicateForSamples(withStart: startDate, end: endDate)
+
+        do {
+            let statistics = try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<HKStatistics?, Error>) in
+                let query = HKStatisticsQuery(quantityType: type, quantitySamplePredicate: predicate, options: .cumulativeSum) { _, statistics, error in
+                    if let error {
+                        continuation.resume(throwing: error)
+                        return
+                    }
+
+                    continuation.resume(returning: statistics)
+                }
+
+                healthStore.execute(query)
+            }
+
+            guard let sum = statistics?.sumQuantity() else {
+                return .init(value: nil, warning: "Step count sample not available.")
+            }
+
+            let value = sum.doubleValue(for: .count())
+            return .init(value: value, warning: nil)
+        } catch {
+            return .init(value: nil, warning: "Step count sample not available.")
         }
     }
 
@@ -317,7 +504,8 @@ final class HealthAgentViewModel: ObservableObject {
         }
         request.httpBody = try JSONEncoder().encode(payload)
 
-        let (_, response) = try await URLSession.shared.data(for: request)
+        let session = URLSession(configuration: .default, delegate: TailnetTrustDelegate(trustedHost: webhookURL.host), delegateQueue: nil)
+        let (_, response) = try await session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse, (200...299).contains(httpResponse.statusCode) else {
             throw HealthAgentError.invalidResponse
@@ -355,18 +543,102 @@ final class HealthAgentViewModel: ObservableObject {
     }
 }
 
+/// Trusts a self-signed TLS certificate ONLY for the specific host the user configured
+/// as their webhook (their own Tailscale-only n8n gateway). All other hosts fall back
+/// to standard system trust evaluation — this does not weaken TLS validation globally.
+final class TailnetTrustDelegate: NSObject, URLSessionDelegate, URLSessionTaskDelegate {
+    private let trustedHost: String?
+
+    init(trustedHost: String?) {
+        self.trustedHost = trustedHost
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        didReceive challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        evaluate(challenge, completionHandler: completionHandler)
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didReceive challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        evaluate(challenge, completionHandler: completionHandler)
+    }
+
+    private func evaluate(
+        _ challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        guard
+            challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+            let serverTrust = challenge.protectionSpace.serverTrust,
+            challenge.protectionSpace.host == trustedHost
+        else {
+            completionHandler(.performDefaultHandling, nil)
+            return
+        }
+        completionHandler(.useCredential, URLCredential(trust: serverTrust))
+    }
+}
+
+/// Wraps a non-Sendable value so it can cross an actor boundary once.
+/// Used to carry HealthKit's completion handler into the @MainActor task.
+private final class UncheckedSendableBox<T>: @unchecked Sendable {
+    let value: T
+    init(_ value: T) { self.value = value }
+}
+
 struct HealthPayload: Codable, Sendable {
     let heartRate: Double?
     let glucose: Double?
     let weight: Double?
     let sleepHours: Double?
+    let hrv: Double?
+    let restingHeartRate: Double?
+    let spo2: Double?
+    let respiratoryRate: Double?
+    let steps: Double?
     let timestamp: String
+
+    init(
+        heartRate: Double? = nil,
+        glucose: Double? = nil,
+        weight: Double? = nil,
+        sleepHours: Double? = nil,
+        hrv: Double? = nil,
+        restingHeartRate: Double? = nil,
+        spo2: Double? = nil,
+        respiratoryRate: Double? = nil,
+        steps: Double? = nil,
+        timestamp: String
+    ) {
+        self.heartRate = heartRate
+        self.glucose = glucose
+        self.weight = weight
+        self.sleepHours = sleepHours
+        self.hrv = hrv
+        self.restingHeartRate = restingHeartRate
+        self.spo2 = spo2
+        self.respiratoryRate = respiratoryRate
+        self.steps = steps
+        self.timestamp = timestamp
+    }
 
     enum CodingKeys: String, CodingKey {
         case heartRate = "heart_rate"
         case glucose
         case weight
         case sleepHours = "sleep_hours"
+        case hrv
+        case restingHeartRate = "resting_heart_rate"
+        case spo2
+        case respiratoryRate = "respiratory_rate"
+        case steps
         case timestamp
     }
 }
@@ -417,6 +689,11 @@ struct SendHistoryPayload: Codable, Sendable {
     let glucose: Double?
     let weight: Double?
     let sleepHours: Double?
+    let hrv: Double?
+    let restingHeartRate: Double?
+    let spo2: Double?
+    let respiratoryRate: Double?
+    let steps: Double?
     let timestamp: String
 
     init(payload: HealthPayload) {
@@ -424,6 +701,11 @@ struct SendHistoryPayload: Codable, Sendable {
         glucose = payload.glucose
         weight = payload.weight
         sleepHours = payload.sleepHours
+        hrv = payload.hrv
+        restingHeartRate = payload.restingHeartRate
+        spo2 = payload.spo2
+        respiratoryRate = payload.respiratoryRate
+        steps = payload.steps
         timestamp = payload.timestamp
     }
 }

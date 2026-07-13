@@ -33,7 +33,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const payload = $json.payload || {};\nconst alerts = [];\n\nif (payload.heart_rate !== null && payload.heart_rate > 85) {\n  alerts.push(`High heart rate: ${payload.heart_rate} bpm`);\n}\n\nif (payload.glucose_mmol !== null && payload.glucose_mmol > 6.0) {\n  alerts.push(`High glucose: ${payload.glucose_mmol} mmol/L`);\n}\n\nif (payload.sleep_hours !== null && payload.sleep_hours < 6) {\n  alerts.push(`Low sleep: ${payload.sleep_hours} hours in the last 24h`);\n}\n\nconst lines = [\n  'HEALTH AGENT ALERT',\n  `Timestamp: ${payload.timestamp}`,\n  '',\n  `heart_rate: ${payload.heart_rate ?? 'null'}`,\n  `glucose_mmol: ${payload.glucose_mmol ?? 'null'}`,\n  `weight: ${payload.weight ?? 'null'}`,\n  `sleep_hours: ${payload.sleep_hours ?? 'null'}`,\n  '',\n  alerts.length ? 'Alerts:' : 'No alerts triggered.',\n];\n\nfor (const alert of alerts) lines.push(`- ${alert}`);\n\nconst hasTelegram = !!($env.TELEGRAM_BOT_TOKEN && $env.TELEGRAM_CHAT_ID);\nconst sendTelegram = alerts.length > 0 && hasTelegram ? 1 : 0;\n\nreturn [{\n  json: {\n    payload,\n    received_at: $json.received_at,\n    source_ip: $json.source_ip,\n    alerts,\n    alert_count: alerts.length,\n    telegram_enabled: hasTelegram,\n    send_telegram: sendTelegram,\n    telegram_text: lines.join('\\n'),\n  },\n}];"
+        "jsCode": "const payload = $json.payload || {};\nconst alerts = [];\n\nif (payload.heart_rate !== null && payload.heart_rate > 85) {\n  alerts.push(`High heart rate: ${payload.heart_rate} bpm`);\n}\n\nif (payload.glucose_mmol !== null && payload.glucose_mmol > 6.0) {\n  alerts.push(`High glucose: ${payload.glucose_mmol} mmol/L`);\n}\n\nif (payload.sleep_hours !== null && payload.sleep_hours < 6) {\n  alerts.push(`Low sleep: ${payload.sleep_hours} hours in the last 24h`);\n}\n\nconst lines = [\n  'HEALTH AGENT ALERT',\n  `Timestamp: ${payload.timestamp}`,\n  '',\n  `heart_rate: ${payload.heart_rate ?? 'null'}`,\n  `glucose_mmol: ${payload.glucose_mmol ?? 'null'}`,\n  `weight: ${payload.weight ?? 'null'}`,\n  `sleep_hours: ${payload.sleep_hours ?? 'null'}`,\n  '',\n  alerts.length ? 'Alerts:' : 'No alerts triggered.',\n];\n\nfor (const alert of alerts) lines.push(`- ${alert}`);\n\nconst sendTelegram = alerts.length > 0 ? 1 : 0;\n\nreturn [{\n  json: {\n    payload,\n    received_at: $json.received_at,\n    source_ip: $json.source_ip,\n    alerts,\n    alert_count: alerts.length,\n    send_telegram: sendTelegram,\n    telegram_text: lines.join('\\n'),\n  },\n}];"
       },
       "id": "5f3d92b1-70c1-4aa2-bd84-1f989f730003",
       "name": "Build Alerts",
@@ -126,6 +126,48 @@
         680,
         240
       ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $('Apple Health Webhook').item.json.body ?? {};\nconst num = v => { const n = Number(v); return Number.isFinite(n) ? n : null; };\nconst map = { heart_rate:'heart_rate', glucose:'glucose', weight:'weight',\n  sleep_hours:'sleep', hrv:'hrv', resting_heart_rate:'rhr',\n  spo2:'spo2', respiratory_rate:'rr', steps:'steps' };\nconst out = { source: 'shortcuts' };\nfor (const [k, canon] of Object.entries(map)) {\n  const v = num(body[k]); if (v !== null) out[canon] = v;\n}\nreturn [{ json: out }];"
+      },
+      "id": "build-receiver-payload",
+      "name": "Build Receiver Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        420
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://host.docker.internal:5679/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "forward-to-receiver",
+      "name": "Forward to Receiver",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        420
+      ],
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "healthrecv001",
+          "name": "Health Receiver Token"
+        }
+      }
     }
   ],
   "connections": {
@@ -134,6 +176,11 @@
         [
           {
             "node": "Normalize Payload",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Build Receiver Payload",
             "type": "main",
             "index": 0
           }
@@ -207,6 +254,17 @@
         [
           {
             "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Receiver Payload": {
+      "main": [
+        [
+          {
+            "node": "Forward to Receiver",
             "type": "main",
             "index": 0
           }

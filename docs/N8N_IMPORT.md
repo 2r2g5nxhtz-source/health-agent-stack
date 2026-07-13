@@ -18,7 +18,25 @@ Advanced version:
 - sends a Telegram alert only if:
   - at least one threshold is triggered
   - `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID` are configured in `n8n`
+- optionally forwards the raw payload to a local receiver service
+  (`Build Receiver Payload` -> `Forward to Receiver` branch) that stores
+  observations in a local SQLite database
 - returns a JSON response to the caller
+
+### Forward to Receiver credential
+
+The `Forward to Receiver` node authenticates with an `httpHeaderAuth`
+credential named `Health Receiver Token` (header `X-Health-Token`). The token
+value itself is **not** stored in the exported workflow JSON. After importing:
+
+1. Create an `Header Auth` credential in `n8n` named `Health Receiver Token`
+2. Set header name `X-Health-Token` and your receiver's token as the value
+3. Point the node URL at your receiver (default `http://host.docker.internal:5679/`)
+
+If you do not run a local receiver, delete the `Build Receiver Payload` and
+`Forward to Receiver` nodes — the Telegram alert branch works independently
+(the forward node uses `onError: continueRegularOutput`, so a missing receiver
+does not break the webhook response either).
 
 The advanced version additionally:
 
@@ -75,7 +93,6 @@ X-Health-Agent-Secret: your-shared-secret
 You can validate the secure webhook with:
 
 ```bash
-cd <путь-к-репозиторию>
 WEBHOOK_URL="http://127.0.0.1:5678/webhook/apple-health-secure" \
 HEALTH_SECRET="your-shared-secret" \
 ./scripts/smoke-test.sh
