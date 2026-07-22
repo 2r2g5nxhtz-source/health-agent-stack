@@ -29,7 +29,7 @@ https://YOUR_N8N_HOST/webhook/apple-health-secure
   "glucose": 100,
   "weight": 75.0,
   "sleep_hours": 8.0,
-  "timestamp": "2026-03-15T08:00:00Z"
+  "timestamp": "2026-01-01T08:00:00Z"
 }
 ```
 

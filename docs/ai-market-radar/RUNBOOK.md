@@ -18,7 +18,7 @@ Use this runbook as an operator guide for a controlled first deployment, not as 
 
 ## Required environment
 
-Copy [/.env.example](<путь-к-репозиторию>/.env.example) into your own environment manager and set all required values.
+Copy [/.env.example](./.env.example) into your own environment manager and set all required values.
 
 Required variables:
 
@@ -36,7 +36,7 @@ Optional variables:
 
 ## Docker bootstrap
 
-Local database bootstrap is available in [docker-compose.ai-market-radar.yml](<путь-к-репозиторию>/docker-compose.ai-market-radar.yml).
+Local database bootstrap is available in [docker-compose.ai-market-radar.yml](./docker-compose.ai-market-radar.yml).
 
 Example:
 
@@ -53,13 +53,13 @@ This starts:
 
 Apply migrations in this exact order:
 
-1. [001_market_radar_init.sql](<путь-к-репозиторию>/sql/ai-market-radar/001_market_radar_init.sql)
-2. [002_event_taxonomy.sql](<путь-к-репозиторию>/sql/ai-market-radar/002_event_taxonomy.sql)
-3. [003_pipeline_state.sql](<путь-к-репозиторию>/sql/ai-market-radar/003_pipeline_state.sql)
-4. [004_seed_services_and_sources.sql](<путь-к-репозиторию>/sql/ai-market-radar/004_seed_services_and_sources.sql)
-5. [005_event_pipeline_hardening.sql](<путь-к-репозиторию>/sql/ai-market-radar/005_event_pipeline_hardening.sql)
-6. [006_runtime_ops.sql](<путь-к-репозиторию>/sql/ai-market-radar/006_runtime_ops.sql)
-7. [007_pipeline_alerts.sql](<путь-к-репозиторию>/sql/ai-market-radar/007_pipeline_alerts.sql)
+1. [001_market_radar_init.sql](./sql/ai-market-radar/001_market_radar_init.sql)
+2. [002_event_taxonomy.sql](./sql/ai-market-radar/002_event_taxonomy.sql)
+3. [003_pipeline_state.sql](./sql/ai-market-radar/003_pipeline_state.sql)
+4. [004_seed_services_and_sources.sql](./sql/ai-market-radar/004_seed_services_and_sources.sql)
+5. [005_event_pipeline_hardening.sql](./sql/ai-market-radar/005_event_pipeline_hardening.sql)
+6. [006_runtime_ops.sql](./sql/ai-market-radar/006_runtime_ops.sql)
+7. [007_pipeline_alerts.sql](./sql/ai-market-radar/007_pipeline_alerts.sql)
 
 Example:
 

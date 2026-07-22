@@ -73,7 +73,7 @@ Example payload (full schema in [`docs/PAYLOAD.md`](./docs/PAYLOAD.md)):
   "spo2": 98,
   "respiratory_rate": 16.0,
   "steps": 10000,
-  "timestamp": "2026-03-15T08:00:00Z"
+  "timestamp": "2026-01-01T08:00:00Z"
 }
 ```
 
